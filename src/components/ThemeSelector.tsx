@@ -1,0 +1,5 @@
+import { useState } from 'react'
+import { Moon, Sun } from 'lucide-react'
+import { applyTheme, getSavedTheme, type Theme } from '../lib/theme'
+
+export function ThemeSelector(){const [theme,setTheme]=useState<Theme>(getSavedTheme());const choose=(value:Theme)=>{setTheme(value);applyTheme(value)};return <section className="card mt-5 p-6"><div><h2 className="font-display text-xl font-bold">Tema de la interfaz</h2><p className="mt-2 text-sm text-stone-500">La preferencia se guarda en este navegador.</p></div><div className="mt-5 grid gap-3 sm:grid-cols-2">{([{value:'light',label:'Interfaz clara',icon:Sun},{value:'dark',label:'Interfaz oscura',icon:Moon}] as const).map(({value,label,icon:Icon})=><button key={value} onClick={()=>choose(value)} aria-pressed={theme===value} className={`flex min-h-16 items-center gap-3 rounded-2xl border p-4 text-left font-bold transition ${theme===value?'border-brand-500 bg-brand-50 text-brand-700 ring-2 ring-brand-100':'border-orange-100 bg-white text-stone-600 hover:bg-brand-50'}`}><Icon className="text-brand-500"/><span>{label}</span></button>)}</div></section>}
