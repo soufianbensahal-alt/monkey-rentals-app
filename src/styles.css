@@ -108,6 +108,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .mobile-more-link-active { color:#fff; border-color:rgba(249,115,22,.6); background:rgba(249,115,22,.95); }
 .mobile-calendar-shortcut { display:grid; width:2.75rem; height:2.75rem; flex:0 0 auto; place-items:center; border:1px solid var(--app-border); border-radius:.9rem; color:var(--app-muted); background:var(--app-surface); transition:color .2s ease,background-color .2s ease,border-color .2s ease; }
 .mobile-calendar-shortcut-active { color:#fff; border-color:#f97316; background:#f97316; }
+.notification-panel { position:fixed; z-index:90; left:.75rem; right:.75rem; top:calc(5rem + env(safe-area-inset-top)); bottom:calc(6.5rem + env(safe-area-inset-bottom)); display:flex; min-height:0; flex-direction:column; overflow:hidden; padding:1rem; border:1px solid var(--app-border); border-radius:1.5rem; color:var(--app-text); background:var(--app-surface); box-shadow:0 24px 70px rgba(0,0,0,.35); animation:mobile-sheet-up .2s ease-out both; }
+.notification-item { display:block; width:100%; min-height:3.5rem; padding:.75rem; border-radius:.75rem; text-align:left; transition:background-color .2s ease; }
+.notification-item:hover { background:var(--app-surface-soft); }
+.notification-item:active { background:rgba(249,115,22,.14); }
 .customer-call-button { @apply inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-orange-200 bg-brand-50 px-3 text-xs font-bold text-brand-700 transition hover:border-brand-500 hover:bg-brand-100 active:scale-[.97]; }
 :root[data-theme="dark"] .bg-cream { background-color:var(--app-bg) !important; }
 :root[data-theme="dark"] .bg-white, :root[data-theme="dark"] .bg-white\/95 { background-color:var(--app-surface) !important; }
@@ -195,6 +199,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 @keyframes mobile-sheet-up { from { opacity:0; transform:translateY(18px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
 @media (min-width:768px) {
   .mobile-bottom-nav, .mobile-more-sheet, .mobile-calendar-shortcut { display:none !important; }
+  .notification-panel { left:auto; right:2rem; top:5.5rem; bottom:auto; width:23.75rem; max-height:calc(100dvh - 7rem); border-radius:1rem; padding:.75rem; }
 }
 @media (max-width:768px), (min-width:769px) and (max-width:1023px) and (orientation:portrait) {
   .app-sidebar { display:none !important; }

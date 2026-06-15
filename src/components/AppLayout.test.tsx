@@ -49,6 +49,18 @@ describe('AppLayout navigation',()=>{
     expect(mobileNav).not.toHaveTextContent('Calendario')
   })
 
+  it('abre y cierra el panel de notificaciones móvil por encima de la navegación',()=>{
+    setDesktop(false)
+    renderLayout()
+    fireEvent.click(screen.getByRole('button',{name:'0 alertas'}))
+    const panel=screen.getByRole('dialog',{name:'Notificaciones'})
+    expect(panel).toBeInTheDocument()
+    expect(panel.parentElement).toBe(document.body)
+    expect(screen.getByText('No tienes avisos pendientes.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button',{name:'Cerrar notificaciones'}))
+    expect(screen.queryByRole('dialog',{name:'Notificaciones'})).not.toBeInTheDocument()
+  })
+
   it('no muestra la X del drawer al contraer el menú de escritorio',()=>{
     setDesktop(true)
     const {container}=renderLayout()

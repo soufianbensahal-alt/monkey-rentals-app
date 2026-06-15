@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Bell,
@@ -75,6 +76,7 @@ export function AppLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const noticesRef = useRef<HTMLDivElement>(null)
+  const noticesPanelRef = useRef<HTMLElement>(null)
   const alerts = getSystemAlerts(state)
   const current = desktopNav.find(item => item.end ? location.pathname === item.to : location.pathname.startsWith(item.to))?.label
     ?? 'Monkey Rentals'
@@ -108,10 +110,13 @@ export function AppLayout() {
   useEffect(() => {
     if (!notices) return
     const close = (event: PointerEvent) => {
-      if (!noticesRef.current?.contains(event.target as Node)) setNotices(false)
+      const target=event.target as Node
+      if (!noticesRef.current?.contains(target) && !noticesPanelRef.current?.contains(target)) setNotices(false)
     }
+    const closeOnEscape = (event:KeyboardEvent) => { if(event.key==='Escape') setNotices(false) }
     document.addEventListener('pointerdown', close)
-    return () => document.removeEventListener('pointerdown', close)
+    document.addEventListener('keydown',closeOnEscape)
+    return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown',closeOnEscape) }
   }, [notices])
 
   const go = (to: string) => {
@@ -120,6 +125,19 @@ export function AppLayout() {
     setNotices(false)
     setMoreOpen(false)
   }
+
+  const notificationLayer=notices?createPortal(<>
+    <button className="fixed inset-0 z-[80] bg-stone-950/40 backdrop-blur-[1px]" onClick={() => setNotices(false)} aria-label="Cerrar notificaciones"/>
+    <section ref={noticesPanelRef} className="notification-panel" role="dialog" aria-modal="true" aria-label="Notificaciones">
+      <div className="flex shrink-0 items-center justify-between border-b border-orange-100 px-1 pb-3">
+        <div><h2 className="font-display text-lg font-bold text-ink">Alertas</h2><p className="text-xs text-stone-500">{alerts.length} pendientes</p></div>
+        <button className="icon-btn" onClick={() => setNotices(false)} aria-label="Cerrar alertas"><X size={18}/></button>
+      </div>
+      <div className="mt-2 min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        {alerts.length ? alerts.map(alert => <button key={alert.id} onClick={() => go(alert.to)} className="notification-item"><p className="text-sm font-bold text-ink">{alert.title}</p><p className="mt-1 text-xs leading-5 text-stone-500">{alert.detail} · {alert.date}</p></button>) : <div className="grid min-h-44 place-items-center px-4 text-center"><div><Bell className="mx-auto text-brand-500" size={24}/><p className="mt-3 text-sm font-semibold text-ink">No tienes avisos pendientes.</p></div></div>}
+      </div>
+    </section>
+  </>,document.body):null
 
   return <div className="min-h-dvh bg-cream md:flex">
     <aside className={`app-sidebar hidden h-dvh flex-col border-r border-orange-100 bg-white text-ink md:sticky md:top-0 md:flex ${collapsed ? 'md:w-[88px]' : 'md:w-[276px]'} transition-[width] duration-300`}>
@@ -150,7 +168,6 @@ export function AppLayout() {
         </div>
         <div ref={noticesRef} className="relative">
           <button className="icon-btn relative" onClick={() => setNotices(value => !value)} aria-label={`${alerts.length} alertas`} aria-expanded={notices}><Bell size={20}/>{alerts.length > 0 && <span className="absolute right-2 top-2 size-2 rounded-full bg-red-500 ring-2 ring-white"/>}</button>
-          {notices && <><button className="fixed inset-0 z-40 bg-stone-950/35 sm:hidden" onClick={() => setNotices(false)} aria-label="Cerrar notificaciones"/><section className="fixed inset-x-3 bottom-[calc(6.75rem+env(safe-area-inset-bottom))] z-50 max-h-[65dvh] rounded-3xl border border-orange-100 bg-white p-4 shadow-2xl sm:absolute sm:inset-auto sm:right-0 sm:top-14 sm:z-30 sm:max-h-[min(520px,calc(100dvh-7rem))] sm:w-[380px] sm:rounded-2xl sm:p-3"><div className="flex items-center justify-between border-b border-orange-100 px-2 pb-3"><div><h2 className="font-display text-lg font-bold">Alertas</h2><p className="text-xs text-stone-500">{alerts.length} pendientes</p></div><button className="icon-btn" onClick={() => setNotices(false)} aria-label="Cerrar alertas"><X size={18}/></button></div><div className="mt-2 max-h-[calc(65dvh-6rem)] overflow-y-auto overscroll-contain sm:max-h-[390px]">{alerts.length ? alerts.map(alert => <button key={alert.id} onClick={() => go(alert.to)} className="w-full rounded-xl p-3 text-left hover:bg-brand-50"><p className="text-sm font-bold text-ink">{alert.title}</p><p className="mt-1 text-xs leading-5 text-stone-500">{alert.detail} · {alert.date}</p></button>) : <p className="p-8 text-center text-sm text-stone-500">No hay alertas activas.</p>}</div></section></>}
         </div>
       </header>
       <main id="main-content" className="p-4 pb-32 sm:p-6 sm:pb-32 md:p-8"><Outlet/></main>
@@ -162,5 +179,6 @@ export function AppLayout() {
       {primaryNav.map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} className={({ isActive }) => `mobile-nav-link ${isActive ? 'mobile-nav-link-active' : ''}`}><Icon size={21}/><span>{label}</span></NavLink>)}
       <button className={`mobile-nav-link ${secondaryActive || moreOpen ? 'mobile-nav-link-active' : ''}`} onClick={() => setMoreOpen(value => !value)} aria-label="Más secciones" aria-expanded={moreOpen}><MoreHorizontal size={22}/><span>Más</span></button>
     </nav>
+    {notificationLayer}
   </div>
 }
