@@ -112,6 +112,11 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .notification-item { display:block; width:100%; min-height:3.5rem; padding:.75rem; border-radius:.75rem; text-align:left; transition:background-color .2s ease; }
 .notification-item:hover { background:var(--app-surface-soft); }
 .notification-item:active { background:rgba(249,115,22,.14); }
+.sync-pill { min-height:2rem; border:1px solid var(--app-border); border-radius:999px; padding:0 .7rem; background:var(--app-surface); color:var(--app-muted); font-size:.68rem; font-weight:800; white-space:nowrap; }
+.sync-pill-online { color:#047857; border-color:#bbf7d0; background:#ecfdf5; }
+.sync-pill-loading, .sync-pill-local, .sync-pill-login { color:#57534e; border-color:#e7e5e4; background:#fafaf9; }
+.sync-pill-saving { color:#c2410c; border-color:#fed7aa; background:#fff7ed; }
+.sync-pill-offline, .sync-pill-error { color:#b91c1c; border-color:#fecaca; background:#fef2f2; cursor:pointer; }
 .customer-call-button { @apply inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-orange-200 bg-brand-50 px-3 text-xs font-bold text-brand-700 transition hover:border-brand-500 hover:bg-brand-100 active:scale-[.97]; }
 :root[data-theme="dark"] .bg-cream { background-color:var(--app-bg) !important; }
 :root[data-theme="dark"] .bg-white, :root[data-theme="dark"] .bg-white\/95 { background-color:var(--app-surface) !important; }
@@ -195,6 +200,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
 :root[data-theme="dark"] .calendar-agenda-card { background:#222 !important; border-color:#3f3f3f !important; }
 :root[data-theme="dark"] .customer-call-button { color:#fff; border-color:#4b2a18; background:#2b1d15; }
 :root[data-theme="dark"] .customer-call-button:hover { border-color:#f97316; background:#3a2518; }
+:root[data-theme="dark"] .sync-pill-online { color:#86efac; border-color:#14532d; background:#052e1a; }
+:root[data-theme="dark"] .sync-pill-loading, :root[data-theme="dark"] .sync-pill-local, :root[data-theme="dark"] .sync-pill-login { color:#e7e5e4; border-color:#3f3f46; background:#202020; }
+:root[data-theme="dark"] .sync-pill-saving { color:#fdba74; border-color:#7c2d12; background:#2b1d15; }
+:root[data-theme="dark"] .sync-pill-offline, :root[data-theme="dark"] .sync-pill-error { color:#fca5a5; border-color:#7f1d1d; background:#2a1212; }
 @keyframes fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes mobile-sheet-up { from { opacity:0; transform:translateY(18px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
 @media (min-width:768px) {

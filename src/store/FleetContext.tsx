@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { emptyState } from '../data/emptyState'
+import { fetchRemoteState, hasBusinessData, readRemoteSession, remoteEnabled, saveRemoteSession, saveRemoteState, signInRemote, type RemoteSession, type RemoteStatus } from '../lib/remoteStore'
 import type { AdminSettings, CalendarEvent, Customer, Document, Fine, FleetState, MaintenanceRecord, Payment, Rental, Task, Vehicle, VehicleTax } from '../types'
 
 export const STORAGE_KEY = 'monkey-rentals-flota:v4'
@@ -7,6 +8,7 @@ const LEGACY_STORAGE_KEYS = ['monkey-rentals-flota:v3','monkey-rentals-flota:v2'
 type Entity = Vehicle | Customer | Rental | Payment | Task | MaintenanceRecord | Document | VehicleTax | Fine | CalendarEvent
 type Collection = 'vehicles' | 'customers' | 'rentals' | 'payments' | 'tasks' | 'maintenance' | 'documents' | 'taxes' | 'fines' | 'events'
 type Action =
+  | { type:'hydrate'; state:FleetState }
   | { type:'upsert'; collection:Collection; item:Entity }
   | { type:'remove'; collection:Collection; id:string }
   | { type:'toggleTask'; id:string }
@@ -21,6 +23,7 @@ function addMonth(date: string) {
 }
 
 function reducer(state: FleetState, action: Action): FleetState {
+  if (action.type === 'hydrate') return action.state
   if (action.type === 'reset') return structuredClone(emptyState)
   if (action.type === 'settings') return { ...state, adminSettings: action.settings }
   if (action.type === 'toggleTask') return { ...state, tasks: state.tasks.map(t => t.id === action.id ? { ...t, completed: !t.completed } : t) }
@@ -114,29 +117,174 @@ function migrateV2(value: Record<string, unknown>): FleetState {
 
 interface FleetContextValue {
   state:FleetState
+  syncStatus:RemoteStatus
+  syncError:string
+  remoteEnabled:boolean
+  authEmail?:string
   upsert:(collection:Collection,item:Entity)=>void
   remove:(collection:Collection,id:string)=>void
   toggleTask:(id:string)=>void
   markPaymentPaid:(id:string)=>void
   updateSettings:(settings:AdminSettings)=>void
   reset:()=>void
+  signIn:(email:string,password:string)=>Promise<void>
+  signOut:()=>void
+  retrySync:()=>Promise<void>
 }
 const FleetContext = createContext<FleetContextValue | null>(null)
 
 export function FleetProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, initialState)
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)) }, [state])
+  const initialCache = useRef(state)
+  const [session,setSession] = useState<RemoteSession|null>(() => remoteEnabled ? readRemoteSession() : null)
+  const [syncStatus,setSyncStatus] = useState<RemoteStatus>(() => remoteEnabled ? (readRemoteSession() ? 'loading' : 'login') : 'local')
+  const [syncError,setSyncError] = useState('')
+  const hydrated = useRef(!remoteEnabled)
+  const skipNextSave = useRef(false)
+  const remoteUpdatedAt = useRef<string>('')
+  const stateRef = useRef(state)
+
+  useEffect(() => { stateRef.current = state }, [state])
+
+  const hydrateFromRemote = useCallback(async (currentSession = session) => {
+    if (!remoteEnabled || !currentSession) return
+    setSyncStatus('loading')
+    try {
+      const remote = await fetchRemoteState(currentSession)
+      if (remote) {
+        remoteUpdatedAt.current = remote.updated_at
+        skipNextSave.current = true
+        dispatch({ type:'hydrate', state:remote.state })
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(remote.state))
+      } else if (hasBusinessData(initialCache.current)) {
+        remoteUpdatedAt.current = await saveRemoteState(initialCache.current, currentSession)
+      }
+      hydrated.current = true
+      setSyncStatus('online')
+      setSyncError('')
+    } catch (error) {
+      hydrated.current = true
+      setSyncStatus('offline')
+      setSyncError(error instanceof Error ? error.message : 'Sin conexión con la base de datos.')
+    }
+  }, [session])
+
+  useEffect(() => {
+    if (!remoteEnabled) {
+      hydrated.current = true
+      return
+    }
+    if (!session) {
+      return
+    }
+    const timeout = window.setTimeout(() => void hydrateFromRemote(session), 0)
+    return () => window.clearTimeout(timeout)
+  }, [session, hydrateFromRemote])
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    if (!remoteEnabled || !session || !hydrated.current) return
+    if (skipNextSave.current) {
+      skipNextSave.current = false
+      return
+    }
+    const timeout = window.setTimeout(async () => {
+      setSyncStatus('saving')
+      try {
+        remoteUpdatedAt.current = await saveRemoteState(stateRef.current, session)
+        setSyncStatus('online')
+        setSyncError('')
+      } catch (error) {
+        setSyncStatus('offline')
+        setSyncError(error instanceof Error ? error.message : 'Cambios guardados solo en caché local.')
+      }
+    }, 650)
+    return () => window.clearTimeout(timeout)
+  }, [state, session])
+
+  useEffect(() => {
+    if (!remoteEnabled || !session) return
+    const refresh = async () => {
+      try {
+        const remote = await fetchRemoteState(session)
+        if (remote && remote.updated_at && remote.updated_at !== remoteUpdatedAt.current) {
+          remoteUpdatedAt.current = remote.updated_at
+          skipNextSave.current = true
+          dispatch({ type:'hydrate', state:remote.state })
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(remote.state))
+        }
+        setSyncStatus('online')
+        setSyncError('')
+      } catch {
+        setSyncStatus('offline')
+      }
+    }
+    const onFocus = () => void refresh()
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+    const interval = window.setInterval(refresh, 15000)
+    return () => { window.removeEventListener('focus', onFocus); document.removeEventListener('visibilitychange', onFocus); window.clearInterval(interval) }
+  }, [session])
+
+  const signIn = useCallback(async (email:string,password:string) => {
+    setSyncStatus('loading')
+    try {
+      const nextSession = await signInRemote(email,password)
+      saveRemoteSession(nextSession)
+      setSyncError('')
+      setSession(nextSession)
+    } catch (error) {
+      setSyncStatus('login')
+      setSyncError(error instanceof Error ? error.message : 'No se ha podido iniciar sesión.')
+      throw error
+    }
+  }, [])
+
+  const signOut = useCallback(() => {
+    saveRemoteSession(null)
+    setSession(null)
+    setSyncStatus(remoteEnabled ? 'login' : 'local')
+  }, [])
+
+  const retrySync = useCallback(async () => { await hydrateFromRemote(session) }, [hydrateFromRemote, session])
+
   const value = useMemo(() => ({
-    state,
+    state, syncStatus, syncError, remoteEnabled, authEmail:session?.email,
     upsert:(collection:Collection,item:Entity)=>dispatch({type:'upsert',collection,item}),
     remove:(collection:Collection,id:string)=>dispatch({type:'remove',collection,id}),
     toggleTask:(id:string)=>dispatch({type:'toggleTask',id}),
     markPaymentPaid:(id:string)=>dispatch({type:'markPaymentPaid',id}),
     updateSettings:(settings:AdminSettings)=>dispatch({type:'settings',settings}),
     reset:()=>dispatch({type:'reset'}),
-  }), [state])
-  return <FleetContext.Provider value={value}>{children}</FleetContext.Provider>
+    signIn, signOut, retrySync,
+  }), [state, syncStatus, syncError, session?.email, signIn, signOut, retrySync])
+  return <FleetContext.Provider value={value}>{remoteEnabled && !session ? <LoginScreen error={syncError} onSubmit={signIn}/> : children}</FleetContext.Provider>
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function useFleet() { const context = useContext(FleetContext); if (!context) throw new Error('useFleet requiere FleetProvider'); return context }
+
+function LoginScreen({error,onSubmit}:{error:string;onSubmit:(email:string,password:string)=>Promise<void>}) {
+  const [message,setMessage]=useState(error)
+  const [loading,setLoading]=useState(false)
+  const submit=async(event:FormEvent<HTMLFormElement>)=>{
+    event.preventDefault()
+    const form=new FormData(event.currentTarget)
+    setLoading(true)
+    setMessage('')
+    try { await onSubmit(String(form.get('email')),String(form.get('password'))) }
+    catch (err) { setMessage(err instanceof Error ? err.message : 'No se ha podido iniciar sesión.') }
+    finally { setLoading(false) }
+  }
+  return <main className="grid min-h-dvh place-items-center bg-cream p-4">
+    <form onSubmit={submit} className="card w-full max-w-md p-6 sm:p-8">
+      <img src="/monkey-rentals-logo.png" alt="" className="mx-auto size-20 object-contain"/>
+      <h1 className="mt-4 text-center font-display text-2xl font-bold text-ink">Acceso Monkey Rentals</h1>
+      <p className="mt-2 text-center text-sm text-stone-500">Inicia sesión para sincronizar la flota en todos los dispositivos.</p>
+      {message&&<p role="alert" className="mt-5 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{message}</p>}
+      <label className="mt-5 block"><span className="label">Email</span><input className="field" name="email" type="email" autoComplete="email" required/></label>
+      <label className="mt-4 block"><span className="label">Contraseña</span><input className="field" name="password" type="password" autoComplete="current-password" required/></label>
+      <button className="btn-primary mt-6 w-full" disabled={loading}>{loading?'Conectando...':'Entrar'}</button>
+    </form>
+  </main>
+}

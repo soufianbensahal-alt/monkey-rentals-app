@@ -72,7 +72,7 @@ export function AppLayout() {
   const [search, setSearch] = useState('')
   const [searchFocused, setSearchFocused] = useState(false)
   const deferredSearch = useDeferredValue(search)
-  const { state } = useFleet()
+  const { state, syncStatus, syncError, remoteEnabled, authEmail, signOut, retrySync } = useFleet()
   const location = useLocation()
   const navigate = useNavigate()
   const noticesRef = useRef<HTMLDivElement>(null)
@@ -125,6 +125,13 @@ export function AppLayout() {
     setNotices(false)
     setMoreOpen(false)
   }
+  const syncLabel = syncStatus === 'loading'
+    ? 'Cargando'
+    : syncStatus === 'saving'
+      ? 'Guardando'
+      : syncStatus === 'offline' || syncStatus === 'error'
+        ? 'Sin conexión'
+        : 'Sincronizado'
 
   const notificationLayer=notices?createPortal(<>
     <button className="fixed inset-0 z-[80] bg-stone-950/40 backdrop-blur-[1px]" onClick={() => setNotices(false)} aria-label="Cerrar notificaciones"/>
@@ -169,6 +176,12 @@ export function AppLayout() {
         <div ref={noticesRef} className="relative">
           <button className="icon-btn relative" onClick={() => setNotices(value => !value)} aria-label={`${alerts.length} alertas`} aria-expanded={notices}><Bell size={20}/>{alerts.length > 0 && <span className="absolute right-2 top-2 size-2 rounded-full bg-red-500 ring-2 ring-white"/>}</button>
         </div>
+        {remoteEnabled && <div className="hidden items-center gap-2 md:flex">
+          <button className={`sync-pill sync-pill-${syncStatus}`} onClick={syncStatus==='offline'||syncStatus==='error'?()=>void retrySync():undefined} title={syncError || authEmail || 'Sincronización remota'}>
+            {syncLabel}
+          </button>
+          <button className="text-xs font-bold text-stone-500 hover:text-brand-600" onClick={signOut}>Salir</button>
+        </div>}
       </header>
       <main id="main-content" className="p-4 pb-32 sm:p-6 sm:pb-32 md:p-8"><Outlet/></main>
     </div>
