@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { Monitor, Moon, Sun } from 'lucide-react'
 import { emptyState } from '../data/emptyState'
 import { fetchRemoteState, hasBusinessData, readRemoteSession, remoteEnabled, saveRemoteSession, saveRemoteState, signInRemote, type RemoteSession, type RemoteStatus } from '../lib/remoteStore'
-import { applyTheme, getSavedTheme } from '../lib/theme'
+import { applyLoginTheme, applyTheme, getSavedLoginThemeMode, getSavedTheme, saveLoginThemeMode, type ThemeMode } from '../lib/theme'
 import type { AdminSettings, CalendarEvent, Customer, Document, Fine, FleetState, MaintenanceRecord, Payment, Rental, Task, Vehicle, VehicleTax } from '../types'
 
 export const STORAGE_KEY = 'monkey-rentals-flota:v4'
@@ -152,7 +153,8 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       applyTheme(getSavedTheme(), { persist: false })
       return
     }
-    applyTheme(session ? getSavedTheme() : 'light', { persist: false })
+    if (session) applyTheme(getSavedTheme(), { persist: false })
+    else applyLoginTheme(getSavedLoginThemeMode())
   }, [session])
 
   const hydrateFromRemote = useCallback(async (currentSession = session) => {
@@ -273,9 +275,29 @@ export function FleetProvider({ children }: { children: ReactNode }) {
 // eslint-disable-next-line react-refresh/only-export-components
 export function useFleet() { const context = useContext(FleetContext); if (!context) throw new Error('useFleet requiere FleetProvider'); return context }
 
+const loginThemeOptions = [
+  { value:'light', label:'Claro', icon:Sun },
+  { value:'dark', label:'Oscuro', icon:Moon },
+  { value:'system', label:'Sistema', icon:Monitor },
+] as const
+
 function LoginScreen({error,onSubmit}:{error:string;onSubmit:(email:string,password:string)=>Promise<void>}) {
   const [message,setMessage]=useState(error)
   const [loading,setLoading]=useState(false)
+  const [themeMode,setThemeMode]=useState<ThemeMode>(()=>getSavedLoginThemeMode())
+  useEffect(()=>{
+    applyLoginTheme(themeMode)
+    if (themeMode !== 'system' || typeof window === 'undefined' || !window.matchMedia) return
+    const media = window.matchMedia('(prefers-color-scheme: dark)')
+    const update = () => applyLoginTheme('system')
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [themeMode])
+  const chooseTheme=(mode:ThemeMode)=>{
+    setThemeMode(mode)
+    saveLoginThemeMode(mode)
+    applyLoginTheme(mode)
+  }
   const submit=async(event:FormEvent<HTMLFormElement>)=>{
     event.preventDefault()
     const form=new FormData(event.currentTarget)
@@ -285,12 +307,18 @@ function LoginScreen({error,onSubmit}:{error:string;onSubmit:(email:string,passw
     catch (err) { setMessage(err instanceof Error ? err.message : 'No se ha podido iniciar sesión.') }
     finally { setLoading(false) }
   }
-  return <main className="grid min-h-dvh place-items-center bg-cream p-4">
-    <form onSubmit={submit} className="card w-full max-w-md p-6 sm:p-8">
+  return <main className="login-screen grid min-h-dvh place-items-center bg-cream p-4">
+    <form onSubmit={submit} className="login-card card w-full max-w-md p-6 sm:p-8">
       <img src="/monkey-rentals-logo.png" alt="" className="mx-auto size-20 object-contain"/>
       <h1 className="mt-4 text-center font-display text-2xl font-bold text-ink">Acceso Monkey Rentals</h1>
       <p className="mt-2 text-center text-sm text-stone-500">Inicia sesión para sincronizar la flota en todos los dispositivos.</p>
-      {message&&<p role="alert" className="mt-5 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{message}</p>}
+      <div className="login-theme-switcher mt-5" role="group" aria-label="Aspecto del login">
+        {loginThemeOptions.map(({value,label,icon:Icon})=><button key={value} type="button" className="login-theme-button" aria-pressed={themeMode===value} onClick={()=>chooseTheme(value)}>
+          <Icon size={15} aria-hidden="true"/>
+          <span>{label}</span>
+        </button>)}
+      </div>
+      {message&&<p role="alert" className="login-error mt-5 rounded-xl p-3 text-sm font-semibold">{message}</p>}
       <label className="mt-5 block"><span className="label">Email</span><input className="field" name="email" type="email" autoComplete="email" required/></label>
       <label className="mt-4 block"><span className="label">Contraseña</span><input className="field" name="password" type="password" autoComplete="current-password" required/></label>
       <button className="btn-primary mt-6 w-full" disabled={loading}>{loading?'Conectando...':'Entrar'}</button>

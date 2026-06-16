@@ -4,9 +4,9 @@ import { BrowserRouter } from 'react-router-dom'
 import { App } from './App'
 import { FleetProvider } from './store/FleetContext'
 import './styles.css'
-import { applyTheme } from './lib/theme'
+import { applyLoginTheme, getSavedLoginThemeMode } from './lib/theme'
 
-applyTheme('light', { persist: false })
+applyLoginTheme(getSavedLoginThemeMode())
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

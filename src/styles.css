@@ -120,6 +120,15 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .sync-pill-saving { color:#c2410c; border-color:#fed7aa; background:#fff7ed; }
 .sync-pill-offline, .sync-pill-error { color:#b91c1c; border-color:#fecaca; background:#fef2f2; cursor:pointer; }
 .customer-call-button { @apply inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-orange-200 bg-brand-50 px-3 text-xs font-bold text-brand-700 transition hover:border-brand-500 hover:bg-brand-100 active:scale-[.97]; }
+.login-screen { background:var(--app-bg); color:var(--app-text); }
+.login-card { background:var(--app-surface); border-color:var(--app-border); }
+.login-theme-switcher { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.25rem; padding:.25rem; border:1px solid var(--app-border); border-radius:1rem; background:var(--app-surface-soft); }
+.login-theme-button { display:inline-flex; min-height:2.55rem; min-width:0; cursor:pointer; align-items:center; justify-content:center; gap:.35rem; border:1px solid transparent; border-radius:.8rem; color:var(--app-muted); font-size:.75rem; font-weight:800; line-height:1; transition:background-color .2s ease,border-color .2s ease,color .2s ease,box-shadow .2s ease,transform .2s ease; }
+.login-theme-button:hover { color:var(--app-text); background:rgba(249,115,22,.1); }
+.login-theme-button:active { transform:scale(.97); }
+.login-theme-button[aria-pressed="true"] { color:#fff; border-color:#f97316; background:#f97316; box-shadow:0 8px 18px rgba(249,115,22,.22); }
+.login-theme-button:focus-visible { outline:2px solid #fb923c; outline-offset:2px; }
+.login-error { color:#b91c1c; border:1px solid #fecaca; background:#fef2f2; }
 :root[data-theme="dark"] .bg-cream { background-color:var(--app-bg) !important; }
 :root[data-theme="dark"] .bg-white, :root[data-theme="dark"] .bg-white\/95 { background-color:var(--app-surface) !important; }
 :root[data-theme="dark"] .card, :root[data-theme="dark"] .table-shell { background:var(--app-surface); border-color:var(--app-border); box-shadow:none; }
@@ -206,6 +215,11 @@ button, a { -webkit-tap-highlight-color: transparent; }
 :root[data-theme="dark"] .sync-pill-loading, :root[data-theme="dark"] .sync-pill-local, :root[data-theme="dark"] .sync-pill-login { color:#e7e5e4; border-color:#3f3f46; background:#202020; }
 :root[data-theme="dark"] .sync-pill-saving { color:#fdba74; border-color:#7c2d12; background:#2b1d15; }
 :root[data-theme="dark"] .sync-pill-offline, :root[data-theme="dark"] .sync-pill-error { color:#fca5a5; border-color:#7f1d1d; background:#2a1212; }
+:root[data-theme="dark"] .login-theme-switcher { border-color:#34271f; background:#231912; }
+:root[data-theme="dark"] .login-theme-button { color:#cfcfcf; }
+:root[data-theme="dark"] .login-theme-button:hover { color:#fff; background:rgba(249,115,22,.16); }
+:root[data-theme="dark"] .login-theme-button[aria-pressed="true"] { color:#fff; border-color:#fb923c; background:#f97316; box-shadow:0 10px 24px rgba(249,115,22,.2); }
+:root[data-theme="dark"] .login-error { color:#fecaca; border-color:#7f1d1d; background:#2a1212; }
 @keyframes fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes mobile-sheet-up { from { opacity:0; transform:translateY(18px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
 @media (min-width:768px) {
