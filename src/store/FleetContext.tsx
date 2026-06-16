@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { emptyState } from '../data/emptyState'
 import { fetchRemoteState, hasBusinessData, readRemoteSession, remoteEnabled, saveRemoteSession, saveRemoteState, signInRemote, type RemoteSession, type RemoteStatus } from '../lib/remoteStore'
+import { applyTheme, getSavedTheme } from '../lib/theme'
 import type { AdminSettings, CalendarEvent, Customer, Document, Fine, FleetState, MaintenanceRecord, Payment, Rental, Task, Vehicle, VehicleTax } from '../types'
 
 export const STORAGE_KEY = 'monkey-rentals-flota:v4'
@@ -145,6 +146,14 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   const stateRef = useRef(state)
 
   useEffect(() => { stateRef.current = state }, [state])
+
+  useEffect(() => {
+    if (!remoteEnabled) {
+      applyTheme(getSavedTheme(), { persist: false })
+      return
+    }
+    applyTheme(session ? getSavedTheme() : 'light', { persist: false })
+  }, [session])
 
   const hydrateFromRemote = useCallback(async (currentSession = session) => {
     if (!remoteEnabled || !currentSession) return
