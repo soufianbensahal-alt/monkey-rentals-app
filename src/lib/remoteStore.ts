@@ -8,6 +8,7 @@ export interface RemoteSession {
 }
 
 export type RemoteStatus = 'local' | 'login' | 'loading' | 'online' | 'saving' | 'offline' | 'error'
+export type RemoteSignOutScope = 'local' | 'global'
 
 interface RemoteRow {
   state: FleetState
@@ -81,17 +82,30 @@ function parseSession(data: { access_token:string; refresh_token?:string; expire
   return { accessToken:data.access_token, refreshToken:data.refresh_token, expiresAt:data.expires_at, email:data.user?.email || fallbackEmail }
 }
 
-async function refreshRemoteSession(session: RemoteSession): Promise<RemoteSession | null> {
+export async function refreshRemoteSession(session: RemoteSession): Promise<RemoteSession | null> {
   if (!session.refreshToken) return null
   const response = await fetch(`${config.url}/auth/v1/token?grant_type=refresh_token`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ refresh_token: session.refreshToken }),
   })
-  if (!response.ok) return null
+  if (!response.ok) {
+    saveRemoteSession(null)
+    return null
+  }
   const nextSession = parseSession(await response.json(), session.email)
   saveRemoteSession(nextSession)
   return nextSession
+}
+
+export async function signOutRemote(session: RemoteSession, scope: RemoteSignOutScope = 'local'): Promise<void> {
+  const response = await fetch(`${config.url}/auth/v1/logout?scope=${scope}`, {
+    method: 'POST',
+    headers: headers(session),
+  })
+  if (!response.ok) throw new Error(scope === 'global'
+    ? 'No se ha podido cerrar la sesión en todos los dispositivos.'
+    : 'No se ha podido cerrar la sesión remota.')
 }
 
 async function authedFetch(url: string, session: RemoteSession, init: RequestInit = {}, extraHeaders: Record<string, string> = {}) {

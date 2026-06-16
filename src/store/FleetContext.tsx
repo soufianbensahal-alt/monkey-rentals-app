@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Monitor, Moon, ShieldCheck, Sun } from 'lucide-react'
 import { emptyState } from '../data/emptyState'
-import { fetchRemoteState, getRememberRemoteSession, hasBusinessData, readRemoteSession, remoteEnabled, saveRemoteSession, saveRemoteState, setRememberRemoteSession, signInRemote, type RemoteSession, type RemoteStatus } from '../lib/remoteStore'
+import { fetchRemoteState, getRememberRemoteSession, hasBusinessData, readRemoteSession, refreshRemoteSession, remoteEnabled, saveRemoteSession, saveRemoteState, setRememberRemoteSession, signInRemote, signOutRemote, type RemoteSession, type RemoteStatus } from '../lib/remoteStore'
 import { applyLoginTheme, applyTheme, getSavedLoginThemeMode, getSavedTheme, saveLoginThemeMode, type ThemeMode } from '../lib/theme'
 import type { AdminSettings, CalendarEvent, Customer, Document, Fine, FleetState, MaintenanceRecord, Payment, Rental, Task, Vehicle, VehicleTax } from '../types'
 
@@ -131,7 +131,8 @@ interface FleetContextValue {
   updateSettings:(settings:AdminSettings)=>void
   reset:()=>void
   signIn:(email:string,password:string,remember:boolean)=>Promise<void>
-  signOut:()=>void
+  signOut:()=>Promise<void>
+  signOutEverywhere:()=>Promise<void>
   setRememberSession:(remember:boolean)=>void
   retrySync:()=>Promise<void>
 }
@@ -141,6 +142,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, initialState)
   const initialCache = useRef(state)
   const [session,setSession] = useState<RemoteSession|null>(() => remoteEnabled ? readRemoteSession() : null)
+  const initialSessionForValidation = useRef(session)
   const [syncStatus,setSyncStatus] = useState<RemoteStatus>(() => remoteEnabled ? (readRemoteSession() ? 'loading' : 'login') : 'local')
   const [rememberSession,setRememberSessionState] = useState(() => getRememberRemoteSession())
   const [syncError,setSyncError] = useState('')
@@ -178,6 +180,13 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       setSyncError('')
     } catch (error) {
       hydrated.current = true
+      if (!readRemoteSession()) {
+        saveRemoteSession(null)
+        setSession(null)
+        setSyncStatus('login')
+        setSyncError('La sesión ha caducado o se ha cerrado desde otro dispositivo.')
+        return
+      }
       setSyncStatus('offline')
       setSyncError(error instanceof Error ? error.message : 'Sin conexión con la base de datos.')
     }
@@ -230,6 +239,12 @@ export function FleetProvider({ children }: { children: ReactNode }) {
         setSyncStatus('online')
         setSyncError('')
       } catch {
+        if (!readRemoteSession()) {
+          setSession(null)
+          setSyncStatus('login')
+          setSyncError('La sesión ha caducado o se ha cerrado desde otro dispositivo.')
+          return
+        }
         setSyncStatus('offline')
       }
     }
@@ -256,11 +271,42 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const signOut = useCallback(() => {
+  const clearRemoteLogin = useCallback((message = '') => {
     saveRemoteSession(null)
     setSession(null)
     setSyncStatus(remoteEnabled ? 'login' : 'local')
+    setSyncError(message)
   }, [])
+
+  const signOut = useCallback(async () => {
+    const currentSession = session
+    clearRemoteLogin()
+    if (!remoteEnabled || !currentSession) return
+    try { await signOutRemote(currentSession, 'local') } catch { /* La salida local debe completarse aunque falle la red. */ }
+  }, [clearRemoteLogin, session])
+
+  const signOutEverywhere = useCallback(async () => {
+    if (!remoteEnabled || !session) {
+      clearRemoteLogin()
+      return
+    }
+    await signOutRemote(session, 'global')
+    clearRemoteLogin('Sesión cerrada en todos los dispositivos. Vuelve a iniciar sesión para continuar.')
+  }, [clearRemoteLogin, session])
+
+  useEffect(() => {
+    const storedSession = initialSessionForValidation.current
+    if (!remoteEnabled || !storedSession?.refreshToken) return
+    let cancelled = false
+    const validate = async () => {
+      const nextSession = await refreshRemoteSession(storedSession)
+      if (cancelled) return
+      if (nextSession) setSession(nextSession)
+      else clearRemoteLogin('La sesión ha caducado o se ha cerrado desde otro dispositivo.')
+    }
+    void validate()
+    return () => { cancelled = true }
+  }, [clearRemoteLogin])
 
   const setRememberSession = useCallback((remember:boolean) => {
     setRememberRemoteSession(remember)
@@ -282,8 +328,8 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     markPaymentPaid:(id:string)=>dispatch({type:'markPaymentPaid',id}),
     updateSettings:(settings:AdminSettings)=>dispatch({type:'settings',settings}),
     reset:()=>dispatch({type:'reset'}),
-    signIn, signOut, setRememberSession, retrySync,
-  }), [state, syncStatus, syncError, session?.email, rememberSession, signIn, signOut, setRememberSession, retrySync])
+    signIn, signOut, signOutEverywhere, setRememberSession, retrySync,
+  }), [state, syncStatus, syncError, session?.email, rememberSession, signIn, signOut, signOutEverywhere, setRememberSession, retrySync])
   return <FleetContext.Provider value={value}>{remoteEnabled && !session ? <LoginScreen error={syncError} onSubmit={signIn}/> : children}</FleetContext.Provider>
 }
 
@@ -342,7 +388,7 @@ function LoginScreen({error,onSubmit}:{error:string;onSubmit:(email:string,passw
         <span className="login-switch" aria-hidden="true"><span/></span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5 text-sm font-extrabold text-ink"><ShieldCheck size={16}/> Mantener sesión abierta</span>
-          <span className="mt-1 block text-xs leading-5 text-stone-500">Si lo desactivas, la sesión será temporal en este dispositivo.</span>
+          <span className="mt-1 block text-xs leading-5 text-stone-500">Mantener sesión abierta afecta solo a este dispositivo.</span>
         </span>
       </label>
       <button className="btn-primary mt-6 w-full" disabled={loading}>{loading?'Conectando...':'Entrar'}</button>

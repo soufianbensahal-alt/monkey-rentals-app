@@ -91,6 +91,31 @@ describe('remoteStore', () => {
     expect(readRemoteSession()).toBeNull()
   })
 
+  it('cierra sesión globalmente con Supabase Auth', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+    vi.stubGlobal('fetch', fetchMock)
+    const { signOutRemote } = await import('./remoteStore')
+
+    await signOutRemote({ accessToken: 'token-1', refreshToken: 'refresh-1' }, 'global')
+
+    expect(fetchMock).toHaveBeenCalledWith('https://supabase.test/auth/v1/logout?scope=global', expect.objectContaining({
+      method: 'POST',
+      headers: expect.objectContaining({ Authorization: 'Bearer token-1' }),
+    }))
+  })
+
+  it('elimina la sesión local cuando Supabase rechaza el refresh token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 401 })
+    vi.stubGlobal('fetch', fetchMock)
+    const { readRemoteSession, refreshRemoteSession, saveRemoteSession } = await import('./remoteStore')
+    saveRemoteSession({ accessToken: 'token-1', refreshToken: 'refresh-revoked', email: 'hola@monkey.test' })
+
+    const session = await refreshRemoteSession({ accessToken: 'token-1', refreshToken: 'refresh-revoked', email: 'hola@monkey.test' })
+
+    expect(session).toBeNull()
+    expect(readRemoteSession()).toBeNull()
+  })
+
   it('refresca el token caducado y reintenta la lectura', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({ ok: false, status: 401 })
