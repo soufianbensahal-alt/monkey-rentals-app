@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { Monitor, Moon, Sun } from 'lucide-react'
+import { Monitor, Moon, ShieldCheck, Sun } from 'lucide-react'
 import { emptyState } from '../data/emptyState'
-import { fetchRemoteState, hasBusinessData, readRemoteSession, remoteEnabled, saveRemoteSession, saveRemoteState, signInRemote, type RemoteSession, type RemoteStatus } from '../lib/remoteStore'
+import { fetchRemoteState, getRememberRemoteSession, hasBusinessData, readRemoteSession, remoteEnabled, saveRemoteSession, saveRemoteState, setRememberRemoteSession, signInRemote, type RemoteSession, type RemoteStatus } from '../lib/remoteStore'
 import { applyLoginTheme, applyTheme, getSavedLoginThemeMode, getSavedTheme, saveLoginThemeMode, type ThemeMode } from '../lib/theme'
 import type { AdminSettings, CalendarEvent, Customer, Document, Fine, FleetState, MaintenanceRecord, Payment, Rental, Task, Vehicle, VehicleTax } from '../types'
 
@@ -123,14 +123,16 @@ interface FleetContextValue {
   syncError:string
   remoteEnabled:boolean
   authEmail?:string
+  rememberSession:boolean
   upsert:(collection:Collection,item:Entity)=>void
   remove:(collection:Collection,id:string)=>void
   toggleTask:(id:string)=>void
   markPaymentPaid:(id:string)=>void
   updateSettings:(settings:AdminSettings)=>void
   reset:()=>void
-  signIn:(email:string,password:string)=>Promise<void>
+  signIn:(email:string,password:string,remember:boolean)=>Promise<void>
   signOut:()=>void
+  setRememberSession:(remember:boolean)=>void
   retrySync:()=>Promise<void>
 }
 const FleetContext = createContext<FleetContextValue | null>(null)
@@ -140,6 +142,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   const initialCache = useRef(state)
   const [session,setSession] = useState<RemoteSession|null>(() => remoteEnabled ? readRemoteSession() : null)
   const [syncStatus,setSyncStatus] = useState<RemoteStatus>(() => remoteEnabled ? (readRemoteSession() ? 'loading' : 'login') : 'local')
+  const [rememberSession,setRememberSessionState] = useState(() => getRememberRemoteSession())
   const [syncError,setSyncError] = useState('')
   const hydrated = useRef(!remoteEnabled)
   const skipNextSave = useRef(false)
@@ -237,11 +240,13 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     return () => { window.removeEventListener('focus', onFocus); document.removeEventListener('visibilitychange', onFocus); window.clearInterval(interval) }
   }, [session])
 
-  const signIn = useCallback(async (email:string,password:string) => {
+  const signIn = useCallback(async (email:string,password:string,remember:boolean) => {
     setSyncStatus('loading')
     try {
       const nextSession = await signInRemote(email,password)
-      saveRemoteSession(nextSession)
+      setRememberRemoteSession(remember)
+      saveRemoteSession(nextSession, remember)
+      setRememberSessionState(remember)
       setSyncError('')
       setSession(nextSession)
     } catch (error) {
@@ -257,18 +262,28 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     setSyncStatus(remoteEnabled ? 'login' : 'local')
   }, [])
 
+  const setRememberSession = useCallback((remember:boolean) => {
+    setRememberRemoteSession(remember)
+    setRememberSessionState(remember)
+    if (!remember) {
+      saveRemoteSession(null)
+      setSession(null)
+      setSyncStatus(remoteEnabled ? 'login' : 'local')
+    } else if (session) saveRemoteSession(session, true)
+  }, [session])
+
   const retrySync = useCallback(async () => { await hydrateFromRemote(session) }, [hydrateFromRemote, session])
 
   const value = useMemo(() => ({
-    state, syncStatus, syncError, remoteEnabled, authEmail:session?.email,
+    state, syncStatus, syncError, remoteEnabled, authEmail:session?.email, rememberSession,
     upsert:(collection:Collection,item:Entity)=>dispatch({type:'upsert',collection,item}),
     remove:(collection:Collection,id:string)=>dispatch({type:'remove',collection,id}),
     toggleTask:(id:string)=>dispatch({type:'toggleTask',id}),
     markPaymentPaid:(id:string)=>dispatch({type:'markPaymentPaid',id}),
     updateSettings:(settings:AdminSettings)=>dispatch({type:'settings',settings}),
     reset:()=>dispatch({type:'reset'}),
-    signIn, signOut, retrySync,
-  }), [state, syncStatus, syncError, session?.email, signIn, signOut, retrySync])
+    signIn, signOut, setRememberSession, retrySync,
+  }), [state, syncStatus, syncError, session?.email, rememberSession, signIn, signOut, setRememberSession, retrySync])
   return <FleetContext.Provider value={value}>{remoteEnabled && !session ? <LoginScreen error={syncError} onSubmit={signIn}/> : children}</FleetContext.Provider>
 }
 
@@ -281,10 +296,11 @@ const loginThemeOptions = [
   { value:'system', label:'Sistema', icon:Monitor },
 ] as const
 
-function LoginScreen({error,onSubmit}:{error:string;onSubmit:(email:string,password:string)=>Promise<void>}) {
+function LoginScreen({error,onSubmit}:{error:string;onSubmit:(email:string,password:string,remember:boolean)=>Promise<void>}) {
   const [message,setMessage]=useState(error)
   const [loading,setLoading]=useState(false)
   const [themeMode,setThemeMode]=useState<ThemeMode>(()=>getSavedLoginThemeMode())
+  const [remember,setRemember]=useState(()=>getRememberRemoteSession())
   useEffect(()=>{
     applyLoginTheme(themeMode)
     if (themeMode !== 'system' || typeof window === 'undefined' || !window.matchMedia) return
@@ -303,7 +319,7 @@ function LoginScreen({error,onSubmit}:{error:string;onSubmit:(email:string,passw
     const form=new FormData(event.currentTarget)
     setLoading(true)
     setMessage('')
-    try { await onSubmit(String(form.get('email')),String(form.get('password'))) }
+    try { await onSubmit(String(form.get('email')),String(form.get('password')),remember) }
     catch (err) { setMessage(err instanceof Error ? err.message : 'No se ha podido iniciar sesión.') }
     finally { setLoading(false) }
   }
@@ -321,6 +337,14 @@ function LoginScreen({error,onSubmit}:{error:string;onSubmit:(email:string,passw
       {message&&<p role="alert" className="login-error mt-5 rounded-xl p-3 text-sm font-semibold">{message}</p>}
       <label className="mt-5 block"><span className="label">Email</span><input className="field" name="email" type="email" autoComplete="email" required/></label>
       <label className="mt-4 block"><span className="label">Contraseña</span><input className="field" name="password" type="password" autoComplete="current-password" required/></label>
+      <label className="login-remember mt-4 flex cursor-pointer items-start gap-3 rounded-xl border p-3.5">
+        <input className="sr-only" type="checkbox" checked={remember} onChange={event=>setRemember(event.target.checked)}/>
+        <span className="login-switch" aria-hidden="true"><span/></span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5 text-sm font-extrabold text-ink"><ShieldCheck size={16}/> Mantener sesión abierta</span>
+          <span className="mt-1 block text-xs leading-5 text-stone-500">Si lo desactivas, la sesión será temporal en este dispositivo.</span>
+        </span>
+      </label>
       <button className="btn-primary mt-6 w-full" disabled={loading}>{loading?'Conectando...':'Entrar'}</button>
     </form>
   </main>

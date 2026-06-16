@@ -15,6 +15,7 @@ interface RemoteRow {
 }
 
 export const REMOTE_SESSION_KEY = 'monkey-rentals:supabase-session'
+export const REMOTE_REMEMBER_KEY = 'monkey-rentals:remember-session'
 
 const env = import.meta.env
 const config = {
@@ -25,6 +26,22 @@ const config = {
 }
 
 export const remoteEnabled = Boolean(config.url && config.anonKey)
+
+export function getRememberRemoteSession() {
+  return localStorage.getItem(REMOTE_REMEMBER_KEY) !== 'false'
+}
+
+export function setRememberRemoteSession(remember: boolean) {
+  localStorage.setItem(REMOTE_REMEMBER_KEY, remember ? 'true' : 'false')
+  if (!remember) localStorage.removeItem(REMOTE_SESSION_KEY)
+  else {
+    const session = sessionStorage.getItem(REMOTE_SESSION_KEY)
+    if (session) {
+      localStorage.setItem(REMOTE_SESSION_KEY, session)
+      sessionStorage.removeItem(REMOTE_SESSION_KEY)
+    }
+  }
+}
 
 function headers(session?: RemoteSession, extraHeaders: Record<string, string> = {}) {
   return {
@@ -41,16 +58,23 @@ function restUrl(query = '') {
 
 export function readRemoteSession(): RemoteSession | null {
   try {
-    const stored = localStorage.getItem(REMOTE_SESSION_KEY)
+    const stored = getRememberRemoteSession() ? localStorage.getItem(REMOTE_SESSION_KEY) : sessionStorage.getItem(REMOTE_SESSION_KEY)
     return stored ? JSON.parse(stored) as RemoteSession : null
   } catch {
     return null
   }
 }
 
-export function saveRemoteSession(session: RemoteSession | null) {
-  if (session) localStorage.setItem(REMOTE_SESSION_KEY, JSON.stringify(session))
-  else localStorage.removeItem(REMOTE_SESSION_KEY)
+export function saveRemoteSession(session: RemoteSession | null, remember = getRememberRemoteSession()) {
+  if (!session) {
+    localStorage.removeItem(REMOTE_SESSION_KEY)
+    sessionStorage.removeItem(REMOTE_SESSION_KEY)
+    return
+  }
+  const targetStorage = remember ? localStorage : sessionStorage
+  const staleStorage = remember ? sessionStorage : localStorage
+  targetStorage.setItem(REMOTE_SESSION_KEY, JSON.stringify(session))
+  staleStorage.removeItem(REMOTE_SESSION_KEY)
 }
 
 function parseSession(data: { access_token:string; refresh_token?:string; expires_at?:number; user?:{ email?:string } }, fallbackEmail?: string): RemoteSession {

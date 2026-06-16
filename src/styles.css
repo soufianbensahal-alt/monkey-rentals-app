@@ -106,6 +106,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .mobile-sheet-close { display:grid; width:2.75rem; height:2.75rem; place-items:center; border:1px solid rgba(255,255,255,.12); border-radius:.9rem; color:#fff; background:rgba(255,255,255,.06); }
 .mobile-more-link { display:flex; min-height:3.5rem; align-items:center; gap:.7rem; padding:.75rem; border:1px solid rgba(255,255,255,.08); border-radius:1rem; color:#e7e5e4; background:rgba(255,255,255,.045); font-size:.78rem; font-weight:700; }
 .mobile-more-link-active { color:#fff; border-color:rgba(249,115,22,.6); background:rgba(249,115,22,.95); }
+.mobile-more-logo { width:2.75rem; height:2.75rem; flex:0 0 auto; border-radius:999px; border:1px solid rgba(249,115,22,.35); background:#fff7ed; object-fit:contain; padding:.15rem; box-shadow:0 10px 22px rgba(0,0,0,.22); }
 .mobile-signout-button { display:flex; width:100%; min-height:3.5rem; align-items:center; justify-content:center; gap:.65rem; margin-top:.75rem; border:1px solid rgba(249,115,22,.38); border-radius:1rem; color:#fff; background:rgba(249,115,22,.9); font-size:.82rem; font-weight:800; transition:transform .2s ease,background-color .2s ease; }
 .mobile-signout-button:active { transform:scale(.97); }
 .mobile-calendar-shortcut { display:grid; width:2.75rem; height:2.75rem; flex:0 0 auto; place-items:center; border:1px solid var(--app-border); border-radius:.9rem; color:var(--app-muted); background:var(--app-surface); transition:color .2s ease,background-color .2s ease,border-color .2s ease; }
@@ -129,6 +130,13 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .login-theme-button[aria-pressed="true"] { color:#fff; border-color:#f97316; background:#f97316; box-shadow:0 8px 18px rgba(249,115,22,.22); }
 .login-theme-button:focus-visible { outline:2px solid #fb923c; outline-offset:2px; }
 .login-error { color:#b91c1c; border:1px solid #fecaca; background:#fef2f2; }
+.login-remember, .settings-toggle { border-color:var(--app-border); background:var(--app-surface-soft); transition:background-color .2s ease,border-color .2s ease; }
+.login-remember:hover, .settings-toggle:hover { border-color:#fed7aa; background:rgba(249,115,22,.08); }
+.login-switch { position:relative; display:inline-flex; width:2.85rem; height:1.55rem; align-items:center; border-radius:999px; background:#d6d3d1; box-shadow:inset 0 0 0 1px rgba(23,32,29,.08); transition:background-color .2s ease,box-shadow .2s ease; }
+.login-switch span { position:absolute; left:.18rem; width:1.15rem; height:1.15rem; border-radius:999px; background:#fff; box-shadow:0 3px 8px rgba(0,0,0,.18); transition:transform .2s ease; }
+.login-remember input:checked + .login-switch, .settings-toggle input:checked + .login-switch { background:#f97316; box-shadow:0 8px 18px rgba(249,115,22,.22); }
+.login-remember input:checked + .login-switch span, .settings-toggle input:checked + .login-switch span { transform:translateX(1.3rem); }
+.login-remember:has(input:focus-visible), .settings-toggle:has(input:focus-visible) { outline:2px solid #fb923c; outline-offset:3px; }
 :root[data-theme="dark"] .bg-cream { background-color:var(--app-bg) !important; }
 :root[data-theme="dark"] .bg-white, :root[data-theme="dark"] .bg-white\/95 { background-color:var(--app-surface) !important; }
 :root[data-theme="dark"] .card, :root[data-theme="dark"] .table-shell { background:var(--app-surface); border-color:var(--app-border); box-shadow:none; }
@@ -220,6 +228,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 :root[data-theme="dark"] .login-theme-button:hover { color:#fff; background:rgba(249,115,22,.16); }
 :root[data-theme="dark"] .login-theme-button[aria-pressed="true"] { color:#fff; border-color:#fb923c; background:#f97316; box-shadow:0 10px 24px rgba(249,115,22,.2); }
 :root[data-theme="dark"] .login-error { color:#fecaca; border-color:#7f1d1d; background:#2a1212; }
+:root[data-theme="dark"] .login-remember, :root[data-theme="dark"] .settings-toggle { border-color:#34271f; background:#231912; }
+:root[data-theme="dark"] .login-remember:hover, :root[data-theme="dark"] .settings-toggle:hover { border-color:#4b2a18; background:rgba(249,115,22,.12); }
+:root[data-theme="dark"] .login-switch { background:#44403c; box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); }
 @keyframes fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes mobile-sheet-up { from { opacity:0; transform:translateY(18px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
 @media (min-width:768px) {

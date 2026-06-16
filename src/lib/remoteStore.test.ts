@@ -8,6 +8,7 @@ describe('remoteStore', () => {
     vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'anon-key')
     vi.stubEnv('VITE_MONKEY_COMPANY_ID', 'monkey-rentals')
     localStorage.clear()
+    sessionStorage.clear()
   })
 
   afterEach(() => {
@@ -64,6 +65,29 @@ describe('remoteStore', () => {
 
     expect(readRemoteSession()?.email).toBe('hola@monkey.test')
     saveRemoteSession(null)
+    expect(readRemoteSession()).toBeNull()
+  })
+
+  it('guarda sesiones temporales en sessionStorage y no persiste contraseñas', async () => {
+    const { REMOTE_SESSION_KEY, readRemoteSession, saveRemoteSession, setRememberRemoteSession } = await import('./remoteStore')
+
+    setRememberRemoteSession(false)
+    saveRemoteSession({ accessToken: 'token-1', refreshToken: 'refresh-1', email: 'hola@monkey.test' }, false)
+
+    expect(readRemoteSession()?.accessToken).toBe('token-1')
+    expect(localStorage.getItem(REMOTE_SESSION_KEY)).toBeNull()
+    expect(sessionStorage.getItem(REMOTE_SESSION_KEY)).toContain('token-1')
+    expect(sessionStorage.getItem(REMOTE_SESSION_KEY)).not.toContain('secret')
+  })
+
+  it('al desactivar recordar sesión elimina la sesión persistente local', async () => {
+    const { REMOTE_SESSION_KEY, getRememberRemoteSession, readRemoteSession, saveRemoteSession, setRememberRemoteSession } = await import('./remoteStore')
+
+    saveRemoteSession({ accessToken: 'token-1', email: 'hola@monkey.test' }, true)
+    setRememberRemoteSession(false)
+
+    expect(getRememberRemoteSession()).toBe(false)
+    expect(localStorage.getItem(REMOTE_SESSION_KEY)).toBeNull()
     expect(readRemoteSession()).toBeNull()
   })
 

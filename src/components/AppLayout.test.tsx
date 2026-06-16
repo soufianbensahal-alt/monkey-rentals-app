@@ -36,6 +36,7 @@ describe('AppLayout navigation',()=>{
     expect(screen.getByRole('navigation',{name:'Navegación móvil'})).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button',{name:'Más secciones'}))
     expect(screen.getByRole('navigation',{name:'Navegación secundaria'})).toBeInTheDocument()
+    expect(screen.getByRole('img',{name:'Monkey Rentals'})).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button',{name:'Cerrar'}))
     expect(screen.queryByRole('navigation',{name:'Navegación secundaria'})).not.toBeInTheDocument()
   })
