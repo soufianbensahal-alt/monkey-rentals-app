@@ -18,7 +18,8 @@
     "react-router-dom": "latest",
     "recharts": "latest",
     "tailwindcss": "latest",
-    "vite": "latest"
+    "vite": "latest",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",

@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
-import { AlertCircle, ArrowDownRight, ArrowUpRight, Car, CircleDollarSign, TrendingUp } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { AlertCircle, ArrowDownRight, ArrowUpRight, Car, CircleDollarSign, Download, TrendingUp } from 'lucide-react'
 import { Bar, CartesianGrid, Cell, ComposedChart, Legend, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Badge, EmptyState, PageHeader } from '../components/ui'
 import { date, euro } from '../lib/format'
+import { downloadReportExcel } from '../lib/reportExcel'
 import { buildReport, type EconomicMovement } from '../lib/reports'
 import { vehicleLabel } from '../lib/vehicles'
 import { useFleet } from '../store/FleetContext'
@@ -13,10 +14,21 @@ const monthLabel = (value:string) => monthFormatter.format(new Date(`${value}-01
 
 export default function ReportsPage(){
   const {state}=useFleet()
+  const [exportMessage,setExportMessage]=useState('')
   const report=useMemo(()=>buildReport(state),[state])
   const vehicleName=(id?:string)=>id?vehicleLabel(state.vehicles.find(item=>item.id===id)):'Sin datos'
   const hasData=report.hasEconomicData
-  return <div className="fade-up reports-page"><PageHeader eyebrow="Inteligencia de negocio" title="Informes" description="Ingresos, gastos y rentabilidad calculados a partir de los movimientos registrados en la app."/>
+  const exportExcel=async()=>{
+    setExportMessage('')
+    try {
+      const exported=await downloadReportExcel(state)
+      setExportMessage(exported?'Excel generado correctamente.':'No hay datos para exportar.')
+    } catch {
+      setExportMessage('No se ha podido generar el Excel.')
+    }
+  }
+  return <div className="fade-up reports-page"><PageHeader eyebrow="Inteligencia de negocio" title="Informes" description="Ingresos, gastos y rentabilidad calculados a partir de los movimientos registrados en la app." action={<button className="btn-primary" disabled={!hasData} onClick={exportExcel} title={hasData?'Descargar informe Excel':'No hay datos para exportar'}><Download size={18}/> Exportar Excel</button>}/>
+    {exportMessage&&<p role="status" className="mb-4 rounded-2xl border border-orange-100 bg-brand-50/60 px-4 py-3 text-sm font-semibold text-stone-700">{exportMessage}</p>}
     {!hasData?<section className="card"><EmptyState title="No hay datos suficientes para generar informes." description="Cuando registres pagos, gastos de mantenimiento, ITV o impuestos, aparecerán aquí tus gráficos e indicadores."/></section>:<>
       <section className="reports-summary" aria-label="Resumen económico">
         <SummaryCard label="Ingresos cobrados" value={report.summary.totalPaid} detail={`${euro.format(report.summary.monthIncome)} este mes`} icon={ArrowUpRight} tone="income"/>
