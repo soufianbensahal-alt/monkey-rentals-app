@@ -40,6 +40,7 @@ export interface Rental {
   endDate?: string
   agreedPrice: number
   pricePeriod: PricePeriod
+  durationDays?: number
   expectedKilometers: number
   nextPaymentDate?: string
   status: RentalStatus
