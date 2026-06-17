@@ -28,11 +28,9 @@ function SettingsPage(){
     setSaved(true)
   }
   const toggleRemember=(enabled:boolean)=>{
-    if (!enabled && !confirm('Se cerrará la sesión en este dispositivo. Tus datos remotos no se borrarán. ¿Continuar?')) return
     setRememberSession(enabled)
   }
   const closeAllSessions=async()=>{
-    if (!confirm('Se cerrará la sesión de Monkey Rentals en este dispositivo y se revocará el recuerdo de sesión en los demás dispositivos. Tus datos remotos no se borrarán. ¿Continuar?')) return
     setSecurityMessage('')
     try { await signOutEverywhere() }
     catch (error) { setSecurityMessage(error instanceof Error ? error.message : 'No se ha podido cerrar la sesión en todos los dispositivos.') }
