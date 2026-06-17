@@ -4,7 +4,6 @@ import {
   AlertTriangle,
   CalendarCheck,
   CalendarDays,
-  CalendarPlus,
   Car,
   ChevronLeft,
   ChevronRight,
@@ -132,7 +131,7 @@ export default function CalendarPage() {
       eyebrow="Planificación central"
       title="Calendario de avisos"
       description="Controla pagos, alquileres, ITV, mantenimiento, impuestos y multas desde un solo lugar."
-      action={<button className="btn-primary" onClick={() => setAdding(true)}><Plus size={18}/> Añadir recordatorio</button>}
+      action={events.length > 0 ? <button className="btn-primary" onClick={() => setAdding(true)}><Plus size={18}/> Añadir recordatorio</button> : undefined}
     />
 
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -174,7 +173,7 @@ export default function CalendarPage() {
         {view === 'day' && <DayTimeline day={selected} events={selectedEvents}/>} 
       </section>
 
-      <AgendaPanel selected={selected} events={selectedEvents} onAdd={() => setAdding(true)}/>
+      <AgendaPanel selected={selected} events={selectedEvents} showEmptyAction={events.length === 0} onAdd={() => setAdding(true)}/>
     </div>
 
     <section className="mt-5 flex flex-col gap-4 rounded-2xl border border-orange-100 bg-white p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
@@ -237,7 +236,7 @@ function MonthGrid({ cursor, selected, events, onSelect }: { cursor: Date; selec
   </div>
 }
 
-function AgendaPanel({ selected, events, onAdd }: { selected: string; events: AgendaEvent[]; onAdd: () => void }) {
+function AgendaPanel({ selected, events, showEmptyAction, onAdd }: { selected: string; events: AgendaEvent[]; showEmptyAction: boolean; onAdd: () => void }) {
   return <aside className="calendar-agenda">
     <div className="calendar-agenda-header">
       <div>
@@ -248,14 +247,13 @@ function AgendaPanel({ selected, events, onAdd }: { selected: string; events: Ag
     </div>
     <div className="mt-5 flex items-center justify-between">
       <p className="font-bold text-ink">{events.length} aviso{events.length === 1 ? '' : 's'}</p>
-      <button className="inline-flex min-h-10 items-center gap-1.5 rounded-xl px-3 text-sm font-bold text-brand-600 transition hover:bg-brand-50" onClick={onAdd}><CalendarPlus size={17}/> Añadir</button>
     </div>
     <div className="mt-3 space-y-3">
       {events.length ? events.map(event => <AgendaCard key={event.id} event={event}/>) : <div className="calendar-empty">
         <span className="grid size-12 place-items-center rounded-2xl bg-brand-50 text-brand-600"><CalendarCheck/></span>
         <p className="mt-4 font-bold text-ink">Día despejado</p>
         <p className="mt-1 text-sm leading-6 text-stone-500">No hay pagos, entregas ni vencimientos previstos para esta fecha.</p>
-        <button className="mt-4 text-sm font-bold text-brand-600" onClick={onAdd}>Crear un recordatorio</button>
+        {showEmptyAction && <button className="mt-4 text-sm font-bold text-brand-600" onClick={onAdd}>Crear un recordatorio</button>}
       </div>}
     </div>
   </aside>
