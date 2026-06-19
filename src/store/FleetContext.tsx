@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Monitor, Moon, ShieldCheck, Sun } from 'lucide-react'
 import { emptyState } from '../data/emptyState'
-import { fetchRemoteState, getRememberRemoteSession, hasBusinessData, readRemoteSession, refreshRemoteSession, remoteEnabled, saveRemoteSession, saveRemoteState, setRememberRemoteSession, signInRemote, signOutRemote, type RemoteSession, type RemoteStatus } from '../lib/remoteStore'
+import { fetchRemoteState, getRememberRemoteSession, getRemoteOwnerId, readRemoteSession, refreshRemoteSession, remoteEnabled, saveRemoteSession, saveRemoteState, setRememberRemoteSession, signInRemote, signOutRemote, type RemoteSession, type RemoteStatus } from '../lib/remoteStore'
 import { applyLoginTheme, applyTheme, getSavedLoginThemeMode, getSavedTheme, saveLoginThemeMode, type ThemeMode } from '../lib/theme'
 import type { AdminSettings, CalendarEvent, Customer, Document, Fine, FleetState, MaintenanceRecord, Payment, Rental, Task, Vehicle, VehicleTax } from '../types'
 
@@ -69,16 +69,31 @@ function reducer(state: FleetState, action: Action): FleetState {
   return { ...state, [action.collection]: exists ? list.map(item => item.id === action.item.id ? action.item : item) : [action.item, ...list] }
 }
 
-function initialState(): FleetState {
+function parseCachedState(stored: string | null | undefined): FleetState | null {
+  if (!stored) return null
   try {
-    const stored = localStorage.getItem(STORAGE_KEY) ?? LEGACY_STORAGE_KEYS.map(key=>localStorage.getItem(key)).find(Boolean)
-    if (!stored) return structuredClone(emptyState)
     const parsed = JSON.parse(stored) as FleetState | Record<string, unknown>
     if (parsed.version === 4) return parsed as FleetState
     if (parsed.version === 3) return migrateV3(parsed as unknown as Record<string, unknown>)
     if (parsed.version === 2) return migrateV2(parsed as unknown as Record<string, unknown>)
-    return structuredClone(emptyState)
-  } catch { return structuredClone(emptyState) }
+    return null
+  } catch { return null }
+}
+
+function storageKeyForSession(session: RemoteSession | null) {
+  const ownerId = getRemoteOwnerId(session)
+  return ownerId ? `${STORAGE_KEY}:user:${ownerId}` : STORAGE_KEY
+}
+
+function readCachedState(key: string, includeLegacy = true): FleetState | null {
+  const stored = localStorage.getItem(key) ?? (includeLegacy ? LEGACY_STORAGE_KEYS.map(legacyKey=>localStorage.getItem(legacyKey)).find(Boolean) : undefined)
+  return parseCachedState(stored)
+}
+
+function initialState(session: RemoteSession | null = null): FleetState {
+  if (remoteEnabled && session) return readCachedState(storageKeyForSession(session), false) ?? structuredClone(emptyState)
+  if (remoteEnabled) return structuredClone(emptyState)
+  return readCachedState(STORAGE_KEY) ?? structuredClone(emptyState)
 }
 
 function migrateV3(value: Record<string, unknown>): FleetState {
@@ -139,11 +154,12 @@ interface FleetContextValue {
 const FleetContext = createContext<FleetContextValue | null>(null)
 
 export function FleetProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, undefined, initialState)
+  const [initialSession] = useState<RemoteSession|null>(() => remoteEnabled ? readRemoteSession() : null)
+  const [state, dispatch] = useReducer(reducer, undefined, () => initialState(initialSession))
   const initialCache = useRef(state)
-  const [session,setSession] = useState<RemoteSession|null>(() => remoteEnabled ? readRemoteSession() : null)
-  const initialSessionForValidation = useRef(session)
-  const [syncStatus,setSyncStatus] = useState<RemoteStatus>(() => remoteEnabled ? (readRemoteSession() ? 'loading' : 'login') : 'local')
+  const [session,setSession] = useState<RemoteSession|null>(() => initialSession)
+  const initialSessionForValidation = useRef(initialSession)
+  const [syncStatus,setSyncStatus] = useState<RemoteStatus>(() => remoteEnabled ? (initialSession ? 'loading' : 'login') : 'local')
   const [rememberSession,setRememberSessionState] = useState(() => getRememberRemoteSession())
   const [syncError,setSyncError] = useState('')
   const hydrated = useRef(!remoteEnabled)
@@ -164,6 +180,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
 
   const hydrateFromRemote = useCallback(async (currentSession = session) => {
     if (!remoteEnabled || !currentSession) return
+    const cacheKey = storageKeyForSession(currentSession)
     setSyncStatus('loading')
     try {
       const remote = await fetchRemoteState(currentSession)
@@ -171,9 +188,14 @@ export function FleetProvider({ children }: { children: ReactNode }) {
         remoteUpdatedAt.current = remote.updated_at
         skipNextSave.current = true
         dispatch({ type:'hydrate', state:remote.state })
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(remote.state))
-      } else if (hasBusinessData(initialCache.current)) {
-        remoteUpdatedAt.current = await saveRemoteState(initialCache.current, currentSession)
+        localStorage.setItem(cacheKey, JSON.stringify(remote.state))
+      } else {
+        const cachedState = readCachedState(cacheKey, false) ?? structuredClone(emptyState)
+        initialCache.current = cachedState
+        skipNextSave.current = true
+        dispatch({ type:'hydrate', state:cachedState })
+        localStorage.setItem(cacheKey, JSON.stringify(cachedState))
+        remoteUpdatedAt.current = await saveRemoteState(cachedState, currentSession)
       }
       hydrated.current = true
       setSyncStatus('online')
@@ -205,7 +227,8 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   }, [session, hydrateFromRemote])
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    if (remoteEnabled && !session) return
+    localStorage.setItem(storageKeyForSession(session), JSON.stringify(state))
     if (!remoteEnabled || !session || !hydrated.current) return
     if (skipNextSave.current) {
       skipNextSave.current = false
@@ -234,7 +257,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
           remoteUpdatedAt.current = remote.updated_at
           skipNextSave.current = true
           dispatch({ type:'hydrate', state:remote.state })
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(remote.state))
+          localStorage.setItem(storageKeyForSession(session), JSON.stringify(remote.state))
         }
         setSyncStatus('online')
         setSyncError('')
@@ -262,6 +285,14 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       setRememberRemoteSession(remember)
       saveRemoteSession(nextSession, remember)
       setRememberSessionState(remember)
+      const cacheKey = storageKeyForSession(nextSession)
+      const cachedState = readCachedState(cacheKey, false) ?? structuredClone(emptyState)
+      initialCache.current = cachedState
+      remoteUpdatedAt.current = ''
+      hydrated.current = false
+      skipNextSave.current = true
+      dispatch({ type:'hydrate', state:cachedState })
+      localStorage.setItem(cacheKey, JSON.stringify(cachedState))
       setSyncError('')
       setSession(nextSession)
     } catch (error) {
@@ -273,6 +304,11 @@ export function FleetProvider({ children }: { children: ReactNode }) {
 
   const clearRemoteLogin = useCallback((message = '') => {
     saveRemoteSession(null)
+    initialCache.current = structuredClone(emptyState)
+    remoteUpdatedAt.current = ''
+    hydrated.current = !remoteEnabled
+    skipNextSave.current = true
+    dispatch({ type:'hydrate', state:structuredClone(emptyState) })
     setSession(null)
     setSyncStatus(remoteEnabled ? 'login' : 'local')
     setSyncError(message)
@@ -312,11 +348,9 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     setRememberRemoteSession(remember)
     setRememberSessionState(remember)
     if (!remember) {
-      saveRemoteSession(null)
-      setSession(null)
-      setSyncStatus(remoteEnabled ? 'login' : 'local')
+      clearRemoteLogin()
     } else if (session) saveRemoteSession(session, true)
-  }, [session])
+  }, [clearRemoteLogin, session])
 
   const retrySync = useCallback(async () => { await hydrateFromRemote(session) }, [hydrateFromRemote, session])
 

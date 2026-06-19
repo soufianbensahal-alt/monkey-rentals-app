@@ -136,11 +136,15 @@ function RentalModal({ rental, state, error, onClose, onSave }: { rental: Rental
   const includedKm = useMemo(() => calculateIncludedKm(selectedVehicle, pricePeriod, daysNumber), [selectedVehicle, pricePeriod, daysNumber])
 
   useEffect(() => {
-    if (!priceTouched && recommendedPrice !== null) setAgreedPrice(String(recommendedPrice))
+    if (priceTouched || recommendedPrice === null) return
+    const timeout = window.setTimeout(() => setAgreedPrice(String(recommendedPrice)), 0)
+    return () => window.clearTimeout(timeout)
   }, [priceTouched, recommendedPrice])
 
   useEffect(() => {
-    if (!endDateTouched && pricePeriod === 'dia' && validDays) setEndDate(suggestRentalEndDate(startDate, daysNumber))
+    if (endDateTouched || pricePeriod !== 'dia' || !validDays) return
+    const timeout = window.setTimeout(() => setEndDate(suggestRentalEndDate(startDate, daysNumber)), 0)
+    return () => window.clearTimeout(timeout)
   }, [daysNumber, endDateTouched, pricePeriod, startDate, validDays])
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
