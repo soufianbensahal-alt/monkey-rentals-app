@@ -14,6 +14,9 @@ create unique index if not exists fleet_state_user_id_key
 alter table public.fleet_state enable row level security;
 alter table public.fleet_state force row level security;
 
+revoke all on table public.fleet_state from anon;
+grant select, insert, update, delete on table public.fleet_state to authenticated;
+
 drop policy if exists "fleet_state_authenticated_select" on public.fleet_state;
 drop policy if exists "fleet_state_authenticated_insert" on public.fleet_state;
 drop policy if exists "fleet_state_authenticated_update" on public.fleet_state;

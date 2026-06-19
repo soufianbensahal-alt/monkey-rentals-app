@@ -65,6 +65,25 @@ describe('remoteStore', () => {
     await expect(fetchRemoteState({ accessToken:'token-sin-sub' })).rejects.toThrow('usuario autenticado')
   })
 
+  it('usa filas remotas distintas para usuarios distintos', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [{ updated_at: '2026-06-15T10:01:00.000Z' }],
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { saveRemoteState } = await import('./remoteStore')
+
+    await saveRemoteState(emptyState, { accessToken:'token-a', userId:'user-a' })
+    await saveRemoteState(emptyState, { accessToken:'token-b', userId:'user-b' })
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://supabase.test/rest/v1/fleet_state?on_conflict=user_id', expect.objectContaining({
+      body: expect.stringContaining('"user_id":"user-a"'),
+    }))
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://supabase.test/rest/v1/fleet_state?on_conflict=user_id', expect.objectContaining({
+      body: expect.stringContaining('"user_id":"user-b"'),
+    }))
+  })
+
   it('mantiene la sesión remota en localStorage solo como credencial de acceso', async () => {
     const { readRemoteSession, saveRemoteSession } = await import('./remoteStore')
 
@@ -145,5 +164,18 @@ describe('remoteStore', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://supabase.test/auth/v1/token?grant_type=refresh_token', expect.objectContaining({
       body: JSON.stringify({ refresh_token: 'refresh-1' }),
     }))
+  })
+
+  it('conserva el usuario propietario al refrescar una sesión sin objeto user', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ access_token:'token-2', refresh_token:'refresh-2' }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { refreshRemoteSession } = await import('./remoteStore')
+
+    const session = await refreshRemoteSession({ accessToken:'token-1', refreshToken:'refresh-1', userId:'user-a', email:'hola@monkey.test' })
+
+    expect(session).toMatchObject({ accessToken:'token-2', refreshToken:'refresh-2', userId:'user-a', email:'hola@monkey.test' })
   })
 })

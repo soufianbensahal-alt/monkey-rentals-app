@@ -129,8 +129,9 @@ export async function refreshRemoteSession(session: RemoteSession): Promise<Remo
     return null
   }
   const nextSession = parseSession(await response.json(), session.email)
-  saveRemoteSession(nextSession)
-  return nextSession
+  const normalizedSession = { ...nextSession, userId:nextSession.userId || session.userId }
+  saveRemoteSession(normalizedSession)
+  return normalizedSession
 }
 
 export async function signOutRemote(session: RemoteSession, scope: RemoteSignOutScope = 'local'): Promise<void> {
