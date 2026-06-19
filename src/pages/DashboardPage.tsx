@@ -5,9 +5,10 @@ import { useFleet } from '../store/FleetContext'
 import { date, euro } from '../lib/format'
 import { daysUntil, effectivePaymentStatus, isPaymentAlert } from '../lib/payments'
 import { getGreeting } from '../lib/greeting'
+import { getVehicleStatusMap } from '../lib/vehicleStatus'
 
 export default function DashboardPage() {
-  const {state,toggleTask,markPaymentPaid}=useFleet(); const available=state.vehicles.filter(v=>v.status==='disponible').length; const active=state.rentals.filter(r=>r.status==='activo').length
+  const {state,toggleTask,markPaymentPaid}=useFleet(); const vehicleStatuses=getVehicleStatusMap(state); const available=state.vehicles.filter(v=>vehicleStatuses.get(v.id)?.status==='disponible').length; const active=state.rentals.filter(r=>r.status==='activo').length
   const pending=state.payments.filter(p=>effectivePaymentStatus(p)!=='pagado').reduce((s,p)=>s+p.amount,0), overdue=state.payments.filter(p=>effectivePaymentStatus(p)==='atrasado').reduce((s,p)=>s+p.amount,0)
   const alerts=state.payments.filter(isPaymentAlert).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));const priorityTone={alta:'danger',media:'warning',baja:'info'} as const
   return <div className="fade-up"><PageHeader eyebrow="Centro operativo" title={`${getGreeting()}, ${state.adminSettings.name}`} description="Controla la flota, los alquileres y los próximos cobros desde un solo lugar." action={<Link to="/app/alquileres?new=1" className={`btn-primary ${!state.vehicles.length||!state.customers.length?'pointer-events-none opacity-50':''}`}><Plus size={18}/> Crear alquiler</Link>}/>

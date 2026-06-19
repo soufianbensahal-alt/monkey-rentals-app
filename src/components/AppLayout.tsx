@@ -26,6 +26,7 @@ import { Brand } from './Brand'
 import { useFleet } from '../store/FleetContext'
 import { vehicleLabel } from '../lib/vehicles'
 import { getSystemAlerts } from '../lib/alerts'
+import { getVehicleStatusMap } from '../lib/vehicleStatus'
 
 interface NavItem {
   to: string
@@ -82,14 +83,21 @@ export function AppLayout() {
   const current = desktopNav.find(item => item.end ? location.pathname === item.to : location.pathname.startsWith(item.to))?.label
     ?? 'Monkey Rentals'
   const secondaryActive = secondaryNav.some(item => item.to !== '/app/calendario' && location.pathname.startsWith(item.to))
+  const vehicleStatuses = useMemo(() => getVehicleStatusMap(state), [state])
 
   const results = useMemo(() => {
     const query = deferredSearch.trim().toLowerCase()
     if (!query) return []
     return [
       ...state.vehicles
-        .filter(vehicle => `${vehicleLabel(vehicle)} ${vehicle.plate} ${vehicle.brand} ${vehicle.model} ${vehicle.status}`.toLowerCase().includes(query))
-        .map(vehicle => ({ id: vehicle.id, title: vehicleLabel(vehicle), detail: `${vehicle.plate} · ${vehicle.status}`, to: '/app/flota' })),
+        .filter(vehicle => {
+          const calculated = vehicleStatuses.get(vehicle.id)
+          return `${vehicleLabel(vehicle)} ${vehicle.plate} ${vehicle.brand} ${vehicle.model} ${calculated?.label} ${calculated?.detail}`.toLowerCase().includes(query)
+        })
+        .map(vehicle => {
+          const calculated = vehicleStatuses.get(vehicle.id)
+          return { id: vehicle.id, title: vehicleLabel(vehicle), detail: `${vehicle.plate} · ${calculated?.label || 'Disponible'}`, to: '/app/flota' }
+        }),
       ...state.customers
         .filter(customer => `${customer.name} ${customer.phone} ${customer.email}`.toLowerCase().includes(query))
         .map(customer => ({ id: customer.id, title: customer.name, detail: customer.email, to: '/app/clientes' })),
@@ -106,7 +114,7 @@ export function AppLayout() {
           to: '/app/alquileres',
         })),
     ].slice(0, 8)
-  }, [deferredSearch, state])
+  }, [deferredSearch, state, vehicleStatuses])
 
   useEffect(() => {
     if (!notices) return

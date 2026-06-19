@@ -88,13 +88,10 @@ export default function RentalsPage() {
 
     upsert('rentals', item)
     if (!editing?.id && item.nextPaymentDate) upsert('payments', { id:uid('p'), rentalId:item.id, dueDate:item.nextPaymentDate, amount:item.agreedPrice, status:'pendiente', method:'', notes:'' })
-    if (vehicle) upsert('vehicles', { ...vehicle, status:item.status === 'activo' ? 'alquilado' : item.status === 'pendiente' ? 'reservado' : 'disponible' })
     setEditing(null)
   }
   const finalize = (rental: Rental) => {
     upsert('rentals', { ...rental, status:'finalizado', endDate:new Date().toISOString().slice(0, 10) })
-    const vehicle = vehicleById.get(rental.vehicleId)
-    if (vehicle) upsert('vehicles', { ...vehicle, status:'disponible' })
   }
   const canCreate = state.vehicles.length > 0 && state.customers.length > 0
 
