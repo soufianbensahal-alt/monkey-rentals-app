@@ -29,7 +29,7 @@ export function getSystemAlerts(state: FleetState): SystemAlert[] {
   })
   const maintenance = state.maintenance.filter(item => item.status === 'programado' && daysUntil(item.date) <= 14).map(item => {
     const days = daysUntil(item.date); const vehicle = state.vehicles.find(v => v.id === item.vehicleId)
-    return { id:`maintenance-${item.id}`, title:days < 0 ? 'Mantenimiento atrasado' : 'Mantenimiento programado', detail:`${item.type} · ${vehicleLabel(vehicle)}`, date:item.date, severity:days < 0 ? 'danger' as const : 'info' as const, to:`/app/documentacion?vehicle=${item.vehicleId}` }
+    return { id:`maintenance-${item.id}`, title:days < 0 ? 'Mantenimiento atrasado' : 'Mantenimiento programado', detail:`${item.type} · ${vehicleLabel(vehicle)}`, date:item.date, severity:days < 0 ? 'danger' as const : 'info' as const, to:'/app/mantenimiento' }
   })
   const fines = state.fines.filter(item => item.status === 'pendiente' || item.status === 'reclamada').map(item => {
     const vehicle = state.vehicles.find(v => v.id === item.vehicleId)
