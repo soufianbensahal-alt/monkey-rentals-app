@@ -155,6 +155,15 @@ export function AppLayout() {
     </section>
   </>,document.body):null
 
+  const mobileNavigationLayer=createPortal(<>
+    {moreOpen && <><button className="fixed inset-0 z-50 bg-stone-950/45 backdrop-blur-[2px] md:hidden" onClick={() => setMoreOpen(false)} aria-label="Cerrar más opciones"/><section className="mobile-more-sheet md:hidden" aria-label="Más secciones"><div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-white/25"/><div className="flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><img src="/monkey-rentals-logo.png" alt="Monkey Rentals" className="mobile-more-logo"/><div className="min-w-0"><p className="text-xs font-bold uppercase tracking-[.16em] text-brand-500">Monkey Rentals</p><h2 className="mt-1 truncate font-display text-xl font-extrabold text-white">Más secciones</h2></div></div><button className="mobile-sheet-close" onClick={() => setMoreOpen(false)} aria-label="Cerrar"><X size={20}/></button></div><nav className="mt-5 grid grid-cols-2 gap-2" aria-label="Navegación secundaria">{secondaryNav.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} onClick={() => setMoreOpen(false)} className={({ isActive }) => `mobile-more-link ${isActive ? 'mobile-more-link-active' : ''}`}><Icon size={21}/><span>{label}</span></NavLink>)}</nav>{remoteEnabled&&<button className="mobile-signout-button" onClick={()=>{setMoreOpen(false);signOut()}}><LogOut size={20}/><span>Cerrar sesión</span></button>}</section></>}
+
+    <nav className="mobile-bottom-nav md:hidden" aria-label="Navegación móvil">
+      {primaryNav.map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} className={({ isActive }) => `mobile-nav-link ${isActive ? 'mobile-nav-link-active' : ''}`}><Icon size={21}/><span>{label}</span></NavLink>)}
+      <button className={`mobile-nav-link ${secondaryActive || moreOpen ? 'mobile-nav-link-active' : ''}`} onClick={() => setMoreOpen(value => !value)} aria-label="Más secciones" aria-expanded={moreOpen}><MoreHorizontal size={22}/><span>Más</span></button>
+    </nav>
+  </>,document.body)
+
   return <div className="min-h-dvh bg-cream md:flex">
     <aside className={`app-sidebar hidden h-dvh flex-col border-r border-orange-100 bg-white text-ink md:sticky md:top-0 md:flex ${collapsed ? 'md:w-[88px]' : 'md:w-[276px]'} transition-[width] duration-300`}>
       <div className={`flex h-20 items-center border-b border-orange-100 ${collapsed ? 'justify-center px-2' : 'justify-between px-5'}`}><Brand compact={collapsed}/></div>
@@ -195,12 +204,7 @@ export function AppLayout() {
       <main id="main-content" className="p-4 pb-32 sm:p-6 sm:pb-32 md:p-8"><Outlet/></main>
     </div>
 
-    {moreOpen && <><button className="fixed inset-0 z-50 bg-stone-950/45 backdrop-blur-[2px] md:hidden" onClick={() => setMoreOpen(false)} aria-label="Cerrar más opciones"/><section className="mobile-more-sheet md:hidden" aria-label="Más secciones"><div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-white/25"/><div className="flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><img src="/monkey-rentals-logo.png" alt="Monkey Rentals" className="mobile-more-logo"/><div className="min-w-0"><p className="text-xs font-bold uppercase tracking-[.16em] text-brand-500">Monkey Rentals</p><h2 className="mt-1 truncate font-display text-xl font-extrabold text-white">Más secciones</h2></div></div><button className="mobile-sheet-close" onClick={() => setMoreOpen(false)} aria-label="Cerrar"><X size={20}/></button></div><nav className="mt-5 grid grid-cols-2 gap-2" aria-label="Navegación secundaria">{secondaryNav.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} onClick={() => setMoreOpen(false)} className={({ isActive }) => `mobile-more-link ${isActive ? 'mobile-more-link-active' : ''}`}><Icon size={21}/><span>{label}</span></NavLink>)}</nav>{remoteEnabled&&<button className="mobile-signout-button" onClick={()=>{setMoreOpen(false);signOut()}}><LogOut size={20}/><span>Cerrar sesión</span></button>}</section></>}
-
-    <nav className="mobile-bottom-nav md:hidden" aria-label="Navegación móvil">
-      {primaryNav.map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} className={({ isActive }) => `mobile-nav-link ${isActive ? 'mobile-nav-link-active' : ''}`}><Icon size={21}/><span>{label}</span></NavLink>)}
-      <button className={`mobile-nav-link ${secondaryActive || moreOpen ? 'mobile-nav-link-active' : ''}`} onClick={() => setMoreOpen(value => !value)} aria-label="Más secciones" aria-expanded={moreOpen}><MoreHorizontal size={22}/><span>Más</span></button>
-    </nav>
+    {mobileNavigationLayer}
     {notificationLayer}
   </div>
 }
