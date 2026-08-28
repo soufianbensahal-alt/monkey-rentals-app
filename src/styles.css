@@ -138,12 +138,12 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .login-remember input:checked + .login-switch span, .settings-toggle input:checked + .login-switch span { transform:translateX(1.3rem); }
 .login-remember:has(input:focus-visible), .settings-toggle:has(input:focus-visible) { outline:2px solid #fb923c; outline-offset:3px; }
 :root[data-theme="dark"] .bg-cream { background-color:var(--app-bg) !important; }
-:root[data-theme="dark"] .bg-white, :root[data-theme="dark"] .bg-white\/95 { background-color:var(--app-surface) !important; }
+:root[data-theme="dark"] .bg-white, :root[data-theme="dark"] .bg-white\/70, :root[data-theme="dark"] .bg-white\/95 { background-color:var(--app-surface) !important; }
 :root[data-theme="dark"] .card, :root[data-theme="dark"] .table-shell { background:var(--app-surface); border-color:var(--app-border); box-shadow:none; }
 :root[data-theme="dark"] .text-ink, :root[data-theme="dark"] .text-stone-700, :root[data-theme="dark"] .text-stone-600 { color:var(--app-text) !important; }
 :root[data-theme="dark"] .text-stone-500, :root[data-theme="dark"] .text-stone-400 { color:var(--app-muted) !important; }
 :root[data-theme="dark"] .border-orange-100, :root[data-theme="dark"] .border-orange-200, :root[data-theme="dark"] .border-stone-100, :root[data-theme="dark"] .border-stone-300 { border-color:var(--app-border) !important; }
-:root[data-theme="dark"] .bg-brand-50, :root[data-theme="dark"] .bg-brand-50\/30, :root[data-theme="dark"] .bg-brand-50\/40, :root[data-theme="dark"] .bg-brand-50\/50, :root[data-theme="dark"] .bg-brand-50\/60 { background-color:var(--app-surface-soft) !important; }
+:root[data-theme="dark"] .bg-brand-50, :root[data-theme="dark"] .bg-brand-50\/30, :root[data-theme="dark"] .bg-brand-50\/40, :root[data-theme="dark"] .bg-brand-50\/50, :root[data-theme="dark"] .bg-brand-50\/60, :root[data-theme="dark"] .bg-brand-50\/70 { background-color:var(--app-surface-soft) !important; }
 :root[data-theme="dark"] .field { background:var(--app-surface); border-color:#444; color:var(--app-text); }
 :root[data-theme="dark"] .label { color:#e7e5e4; }
 :root[data-theme="dark"] .btn-secondary, :root[data-theme="dark"] .icon-btn { background:var(--app-surface); border-color:var(--app-border); color:#e7e5e4; }

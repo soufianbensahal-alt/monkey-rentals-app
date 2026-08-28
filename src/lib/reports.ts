@@ -1,6 +1,8 @@
 import type { FleetState } from '../types'
+import { isFlexiblePayment, paymentKindLabel } from './paymentReminders'
 
 export type ExpenseCategory = 'Reparaciones' | 'Mantenimiento' | 'ITV' | 'Impuestos' | 'Documentación' | 'Otros'
+export type IncomeCategory = 'Alquiler' | 'Pago flexible' | 'Fianza' | 'Penalización' | 'Km extra' | 'Multa' | 'Otro' | 'Alquiler previsto'
 export type MovementStatus = 'pagado' | 'pendiente' | 'atrasado' | 'registrado'
 
 export interface EconomicMovement {
@@ -30,11 +32,11 @@ const documentCategory = (type: string): ExpenseCategory => /itv/i.test(type) ? 
 export function economicMovements(state: FleetState, today = new Date().toISOString().slice(0, 10)): EconomicMovement[] {
   const rentals = new Map(state.rentals.map(item => [item.id, item]))
   const rentalIdsWithPayments = new Set(state.payments.map(item => item.rentalId))
-  const payments: EconomicMovement[] = state.payments.filter(item => Number(item.amount) > 0).map(item => {
+  const payments: EconomicMovement[] = state.payments.filter(item => Number(item.amount) > 0 && item.status !== 'cancelado').map(item => {
     const rental = rentals.get(item.rentalId)
     const status = item.status === 'pagado' || item.status === 'flexible' || item.status === 'atrasado' ? item.status : item.dueDate < today ? 'atrasado' : 'pendiente'
     return {
-      id:`payment-${item.id}`, date:item.paidDate || item.dueDate, kind:'ingreso', category:'Alquiler',
+      id:`payment-${item.id}`, date:item.paidDate || item.dueDate, kind:'ingreso', category:isFlexiblePayment(item) ? 'Pago flexible' : paymentKindLabel(item),
       vehicleId:rental?.vehicleId, customerId:rental?.customerId, amount:Number(item.amount),
       status:status === 'flexible' ? 'pendiente' : status,
     }
@@ -82,6 +84,7 @@ export function buildReport(state: FleetState, today = new Date().toISOString().
   const totalPaid = paidIncome.reduce((sum,item)=>sum+item.amount,0)
   const totalPending = pendingIncome.reduce((sum,item)=>sum+item.amount,0)
   const totalOverdue = overdueIncome.reduce((sum,item)=>sum+item.amount,0)
+  const flexiblePending = pendingIncome.filter(item => item.category === 'Pago flexible').reduce((sum,item)=>sum+item.amount,0)
   const monthIncome = paidIncome.filter(item => monthKey(item.date) === currentMonth).reduce((sum,item)=>sum+item.amount,0)
   const monthExpenses = realizedExpenses.filter(item => monthKey(item.date) === currentMonth).reduce((sum,item)=>sum+item.amount,0)
   const monthlyMap = movements.reduce<Record<string,MonthlyReport>>((acc,item)=>{
@@ -107,6 +110,7 @@ export function buildReport(state: FleetState, today = new Date().toISOString().
     hasEconomicData, movements:[...movements].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,12), monthly, categories,
     summary:{
       totalPaid, totalPending, totalOverdue, totalExpected:totalPaid+totalPending+totalOverdue,
+      flexiblePending,
       monthIncome, monthExpenses, monthProfit:monthIncome-monthExpenses,
       pending:totalPending, overdue:totalOverdue,
       topIncomeVehicleId:topId(vehicleTotals(paidIncome)),

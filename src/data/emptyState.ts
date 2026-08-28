@@ -6,6 +6,7 @@ export const emptyState: FleetState = {
   customers: [],
   rentals: [],
   payments: [],
+  clientDocuments: [],
   tasks: [],
   maintenance: [],
   documents: [],

@@ -2,13 +2,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useReducer,
 import { Monitor, Moon, ShieldCheck, Sun } from 'lucide-react'
 import { emptyState } from '../data/emptyState'
 import { fetchRemoteState, getRememberRemoteSession, getRemoteOwnerId, readRemoteSession, refreshRemoteSession, remoteEnabled, saveRemoteSession, saveRemoteState, setRememberRemoteSession, signInRemote, signOutRemote, type RemoteSession, type RemoteStatus } from '../lib/remoteStore'
+import { getNextPaymentDate } from '../lib/paymentReminders'
 import { applyLoginTheme, applyTheme, getSavedLoginThemeMode, getSavedTheme, saveLoginThemeMode, type ThemeMode } from '../lib/theme'
-import type { AdminSettings, CalendarEvent, Customer, Document, Fine, FleetState, MaintenanceRecord, Payment, Rental, Task, Vehicle, VehicleTax } from '../types'
+import type { AdminSettings, CalendarEvent, ClientDocument, Customer, Document, Fine, FleetState, MaintenanceRecord, Payment, Rental, Task, Vehicle, VehicleTax } from '../types'
 
 export const STORAGE_KEY = 'monkey-rentals-flota:v4'
 const LEGACY_STORAGE_KEYS = ['monkey-rentals-flota:v3','monkey-rentals-flota:v2']
-type Entity = Vehicle | Customer | Rental | Payment | Task | MaintenanceRecord | Document | VehicleTax | Fine | CalendarEvent
-type Collection = 'vehicles' | 'customers' | 'rentals' | 'payments' | 'tasks' | 'maintenance' | 'documents' | 'taxes' | 'fines' | 'events'
+type Entity = Vehicle | Customer | Rental | Payment | ClientDocument | Task | MaintenanceRecord | Document | VehicleTax | Fine | CalendarEvent
+type Collection = 'vehicles' | 'customers' | 'rentals' | 'payments' | 'clientDocuments' | 'tasks' | 'maintenance' | 'documents' | 'taxes' | 'fines' | 'events'
 type Action =
   | { type:'hydrate'; state:FleetState }
   | { type:'upsert'; collection:Collection; item:Entity }
@@ -17,12 +18,6 @@ type Action =
   | { type:'markPaymentPaid'; id:string }
   | { type:'settings'; settings:AdminSettings }
   | { type:'reset' }
-
-function addMonth(date: string) {
-  const next = new Date(`${date}T12:00:00`)
-  next.setMonth(next.getMonth() + 1)
-  return next.toISOString().slice(0, 10)
-}
 
 function reducer(state: FleetState, action: Action): FleetState {
   if (action.type === 'hydrate') return action.state
@@ -33,13 +28,21 @@ function reducer(state: FleetState, action: Action): FleetState {
     const payment = state.payments.find(item => item.id === action.id)
     if (!payment) return state
     const rental = state.rentals.find(item => item.id === payment.rentalId)
-    const nextDate = addMonth(payment.dueDate)
-    const nextPayment: Payment | null = rental?.status === 'activo' && rental.nextPaymentDate ? {
+    const nextDate = getNextPaymentDate(payment)
+    const nextPayment: Payment | null = rental?.status === 'activo' && nextDate ? {
       id: `payment-${Date.now()}`,
       rentalId: payment.rentalId,
       dueDate: nextDate,
-      amount: rental.agreedPrice,
+      amount: rental.nextPaymentAmount || payment.amount || rental.agreedPrice,
       status: 'pendiente',
+      type: payment.type,
+      reminderEnabled: payment.reminderEnabled,
+      reminderDate: nextDate,
+      reminderFrequency: payment.reminderFrequency,
+      recurrenceType: payment.recurrenceType,
+      recurrenceInterval: payment.recurrenceInterval,
+      isFlexible: payment.isFlexible,
+      flexibleNotes: payment.flexibleNotes,
       method: payment.method,
       notes: '',
     } : null
@@ -49,7 +52,7 @@ function reducer(state: FleetState, action: Action): FleetState {
         ...state.payments.map(item => item.id === action.id ? { ...item, status:'pagado' as const, paidDate:new Date().toISOString().slice(0,10) } : item),
         ...(nextPayment && !state.payments.some(item => item.rentalId === nextPayment.rentalId && item.dueDate === nextDate) ? [nextPayment] : []),
       ],
-      rentals: state.rentals.map(item => item.id === payment.rentalId && item.nextPaymentDate ? { ...item, nextPaymentDate:nextDate } : item),
+      rentals: state.rentals.map(item => item.id === payment.rentalId && nextDate ? { ...item, nextPaymentDate:nextDate } : item),
     }
   }
   if (action.type === 'remove') {
@@ -59,7 +62,7 @@ function reducer(state: FleetState, action: Action): FleetState {
     }
     if (action.collection === 'customers') {
       const rentalIds = state.rentals.filter(item => item.customerId === action.id).map(item => item.id)
-      return { ...state, customers:state.customers.filter(item=>item.id!==action.id), rentals:state.rentals.filter(item=>item.customerId!==action.id), payments:state.payments.filter(item=>!rentalIds.includes(item.rentalId)), fines:state.fines.map(item=>item.customerId===action.id?{...item,customerId:undefined}:item) }
+      return { ...state, customers:state.customers.filter(item=>item.id!==action.id), rentals:state.rentals.filter(item=>item.customerId!==action.id), payments:state.payments.filter(item=>!rentalIds.includes(item.rentalId)), clientDocuments:state.clientDocuments.filter(item=>item.customerId!==action.id), fines:state.fines.map(item=>item.customerId===action.id?{...item,customerId:undefined}:item) }
     }
     if (action.collection === 'rentals') return { ...state, rentals:state.rentals.filter(item=>item.id!==action.id), payments:state.payments.filter(item=>item.rentalId!==action.id) }
     return { ...state, [action.collection]: state[action.collection].filter(item => item.id !== action.id) }
@@ -73,11 +76,31 @@ function parseCachedState(stored: string | null | undefined): FleetState | null 
   if (!stored) return null
   try {
     const parsed = JSON.parse(stored) as FleetState | Record<string, unknown>
-    if (parsed.version === 4) return parsed as FleetState
+    if (parsed.version === 4) return normalizeState(parsed as FleetState)
     if (parsed.version === 3) return migrateV3(parsed as unknown as Record<string, unknown>)
     if (parsed.version === 2) return migrateV2(parsed as unknown as Record<string, unknown>)
     return null
   } catch { return null }
+}
+
+function normalizeState(value: Partial<FleetState>): FleetState {
+  return {
+    ...structuredClone(emptyState),
+    ...value,
+    vehicles:Array.isArray(value.vehicles) ? value.vehicles : [],
+    customers:Array.isArray(value.customers) ? value.customers : [],
+    rentals:Array.isArray(value.rentals) ? value.rentals : [],
+    payments:Array.isArray(value.payments) ? value.payments : [],
+    clientDocuments:Array.isArray(value.clientDocuments) ? value.clientDocuments : [],
+    tasks:Array.isArray(value.tasks) ? value.tasks : [],
+    maintenance:Array.isArray(value.maintenance) ? value.maintenance : [],
+    documents:Array.isArray(value.documents) ? value.documents : [],
+    taxes:Array.isArray(value.taxes) ? value.taxes : [],
+    fines:Array.isArray(value.fines) ? value.fines : [],
+    events:Array.isArray(value.events) ? value.events : [],
+    adminSettings:value.adminSettings ?? emptyState.adminSettings,
+    version:4,
+  }
 }
 
 function storageKeyForSession(session: RemoteSession | null) {
@@ -97,7 +120,7 @@ function initialState(session: RemoteSession | null = null): FleetState {
 }
 
 function migrateV3(value: Record<string, unknown>): FleetState {
-  return { ...(value as unknown as Omit<FleetState,'version'|'fines'>), version:4, fines:[] }
+  return normalizeState({ ...(value as unknown as Partial<FleetState>), version:4, fines:[], clientDocuments:[] })
 }
 
 function migrateV2(value: Record<string, unknown>): FleetState {
@@ -124,6 +147,7 @@ function migrateV2(value: Record<string, unknown>): FleetState {
     rentals,
     customers:Array.isArray(value.customers) ? value.customers as Customer[] : [],
     payments:Array.isArray(value.payments) ? value.payments as Payment[] : [],
+    clientDocuments:Array.isArray(value.clientDocuments) ? value.clientDocuments as ClientDocument[] : [],
     tasks:Array.isArray(value.tasks) ? value.tasks as Task[] : [],
     maintenance:Array.isArray(value.maintenance) ? value.maintenance as MaintenanceRecord[] : [],
     documents:(Array.isArray(value.documents) ? value.documents : []).map(item => ({...(item as Document), notes:(item as Document).notes ?? ''})),
@@ -185,10 +209,11 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     try {
       const remote = await fetchRemoteState(currentSession)
       if (remote) {
+        const remoteState = normalizeState(remote.state)
         remoteUpdatedAt.current = remote.updated_at
         skipNextSave.current = true
-        dispatch({ type:'hydrate', state:remote.state })
-        localStorage.setItem(cacheKey, JSON.stringify(remote.state))
+        dispatch({ type:'hydrate', state:remoteState })
+        localStorage.setItem(cacheKey, JSON.stringify(remoteState))
       } else {
         const cachedState = readCachedState(cacheKey, false) ?? structuredClone(emptyState)
         initialCache.current = cachedState
@@ -254,10 +279,11 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       try {
         const remote = await fetchRemoteState(session)
         if (remote && remote.updated_at && remote.updated_at !== remoteUpdatedAt.current) {
+          const remoteState = normalizeState(remote.state)
           remoteUpdatedAt.current = remote.updated_at
           skipNextSave.current = true
-          dispatch({ type:'hydrate', state:remote.state })
-          localStorage.setItem(storageKeyForSession(session), JSON.stringify(remote.state))
+          dispatch({ type:'hydrate', state:remoteState })
+          localStorage.setItem(storageKeyForSession(session), JSON.stringify(remoteState))
         }
         setSyncStatus('online')
         setSyncError('')

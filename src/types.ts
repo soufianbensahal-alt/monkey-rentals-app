@@ -1,8 +1,12 @@
 export type Priority = 'alta' | 'media' | 'baja'
 export type VehicleStatus = 'disponible' | 'alquilado' | 'mantenimiento' | 'reservado'
 export type RentalStatus = 'activo' | 'finalizado' | 'pendiente' | 'cancelado'
-export type PaymentStatus = 'pendiente' | 'pagado' | 'atrasado' | 'flexible'
+export type PaymentStatus = 'pendiente' | 'pagado' | 'atrasado' | 'flexible' | 'cancelado'
 export type PricePeriod = 'dia' | 'semana' | 'mes' | 'otro'
+export type PaymentType = 'normal' | 'flexible' | 'fianza' | 'penalizacion' | 'km_extra' | 'multa' | 'otro'
+export type ReminderFrequency = 'none' | 'once' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'custom'
+export type RecurrenceType = 'unico' | 'recurrente'
+export type ClientDocumentType = 'DNI / NIE' | 'Pasaporte' | 'Carnet de conducir' | 'Contrato firmado' | 'Justificante' | 'Otro'
 
 export interface Vehicle {
   id: string
@@ -43,6 +47,9 @@ export interface Rental {
   durationDays?: number
   expectedKilometers: number
   nextPaymentDate?: string
+  nextPaymentAmount?: number
+  paymentReminderFrequency?: ReminderFrequency
+  paymentRecurrenceType?: RecurrenceType
   status: RentalStatus
   notes: string
 }
@@ -54,7 +61,27 @@ export interface Payment {
   paidDate?: string
   amount: number
   status: PaymentStatus
+  type?: PaymentType
+  reminderEnabled?: boolean
+  reminderDate?: string
+  reminderFrequency?: ReminderFrequency
+  recurrenceType?: RecurrenceType
+  recurrenceInterval?: number
+  isFlexible?: boolean
+  flexibleNotes?: string
   method?: string
+  notes: string
+}
+
+export interface ClientDocument {
+  id: string
+  customerId: string
+  type: ClientDocumentType
+  fileName: string
+  mimeType: string
+  size: number
+  uploadedAt: string
+  dataUrl: string
   notes: string
 }
 
@@ -72,6 +99,7 @@ export interface FleetState {
   customers: Customer[]
   rentals: Rental[]
   payments: Payment[]
+  clientDocuments: ClientDocument[]
   tasks: Task[]
   maintenance: MaintenanceRecord[]
   documents: Document[]

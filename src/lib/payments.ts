@@ -1,7 +1,8 @@
 import type { Payment, PaymentStatus } from '../types'
+import { isFlexiblePayment } from './paymentReminders'
 
 export function effectivePaymentStatus(payment: Payment): PaymentStatus {
-  if (payment.status === 'pagado' || payment.status === 'flexible') return payment.status
+  if (payment.status === 'pagado' || payment.status === 'cancelado' || payment.status === 'flexible') return payment.status
   return payment.dueDate < new Date().toISOString().slice(0, 10) ? 'atrasado' : 'pendiente'
 }
 
@@ -13,5 +14,5 @@ export function daysUntil(date: string) {
 
 export function isPaymentAlert(payment: Payment) {
   const status = effectivePaymentStatus(payment)
-  return status === 'flexible' || status === 'atrasado' || (status === 'pendiente' && daysUntil(payment.dueDate) <= 3)
+  return isFlexiblePayment(payment) || status === 'flexible' || status === 'atrasado' || (status === 'pendiente' && daysUntil(payment.dueDate) <= 3)
 }

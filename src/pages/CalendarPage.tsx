@@ -18,11 +18,13 @@ import {
 import { useFleet } from '../store/FleetContext'
 import { Modal, PageHeader } from '../components/ui'
 import { date, euro, uid } from '../lib/format'
+import { effectivePaymentStatus } from '../lib/payments'
+import { isFlexiblePayment, paymentReminderLabel } from '../lib/paymentReminders'
 import { vehicleLabel } from '../lib/vehicles'
 import type { CalendarEvent } from '../types'
 
 type View = 'month' | 'week' | 'day'
-type EventType = 'pago' | 'atrasado' | 'alquiler' | 'itv' | 'mantenimiento' | 'documento' | 'impuesto' | 'multa' | 'reserva'
+type EventType = 'pago' | 'pago_unico' | 'pago_recurrente' | 'pago_flexible' | 'atrasado' | 'alquiler' | 'itv' | 'mantenimiento' | 'documento' | 'impuesto' | 'multa' | 'reserva'
 
 interface AgendaEvent {
   id: string
@@ -34,6 +36,9 @@ interface AgendaEvent {
 
 const eventStyle: Record<EventType, { label: string; icon: LucideIcon; dot: string; badge: string; card: string }> = {
   pago: { label: 'Pago', icon: CircleDollarSign, dot: 'bg-orange-500', badge: 'bg-orange-100 text-orange-800', card: 'border-orange-200 bg-orange-50/70' },
+  pago_unico: { label: 'Pago único', icon: CircleDollarSign, dot: 'bg-amber-500', badge: 'bg-amber-100 text-amber-900', card: 'border-amber-200 bg-amber-50/70' },
+  pago_recurrente: { label: 'Pago recurrente', icon: CircleDollarSign, dot: 'bg-orange-500', badge: 'bg-orange-100 text-orange-800', card: 'border-orange-200 bg-orange-50/70' },
+  pago_flexible: { label: 'Pago flexible', icon: CircleDollarSign, dot: 'bg-blue-500', badge: 'bg-blue-100 text-blue-800', card: 'border-blue-200 bg-blue-50/70' },
   atrasado: { label: 'Pago atrasado', icon: AlertTriangle, dot: 'bg-red-500', badge: 'bg-red-100 text-red-800', card: 'border-red-200 bg-red-50/70' },
   alquiler: { label: 'Alquiler', icon: Car, dot: 'bg-emerald-700', badge: 'bg-emerald-100 text-emerald-800', card: 'border-emerald-200 bg-emerald-50/70' },
   itv: { label: 'ITV', icon: FileCheck2, dot: 'bg-cyan-800', badge: 'bg-cyan-100 text-cyan-900', card: 'border-cyan-200 bg-cyan-50/70' },
@@ -68,12 +73,20 @@ export default function CalendarPage() {
       const rental = state.rentals.find(item => item.id === payment.rentalId)
       const customer = state.customers.find(item => item.id === rental?.customerId)
       const vehicle = state.vehicles.find(item => item.id === rental?.vehicleId)
+      const status = effectivePaymentStatus(payment)
+      const type: EventType = status === 'atrasado'
+        ? 'atrasado'
+        : isFlexiblePayment(payment)
+          ? 'pago_flexible'
+          : payment.recurrenceType === 'recurrente' || (payment.reminderFrequency && !['none', 'once'].includes(payment.reminderFrequency))
+            ? 'pago_recurrente'
+            : 'pago_unico'
       return {
         id: `payment-${payment.id}`,
         date: payment.dueDate,
-        title: payment.status === 'atrasado' ? `${customer?.name || 'Cliente'} · pago atrasado` : `Pago ${vehicleLabel(vehicle)}`,
-        detail: `${euro.format(payment.amount)} · ${customer?.name || 'Cliente'}`,
-        type: payment.status === 'atrasado' ? 'atrasado' as const : 'pago' as const,
+        title: status === 'atrasado' ? `${customer?.name || 'Cliente'} · pago atrasado` : `Pago ${vehicleLabel(vehicle)}`,
+        detail: `${euro.format(payment.amount)} · ${customer?.name || 'Cliente'} · ${paymentReminderLabel(payment)}`,
+        type,
       }
     }),
     ...state.rentals.flatMap(rental => {
@@ -95,7 +108,7 @@ export default function CalendarPage() {
   const month = cursor.getMonth()
   const selectedEvents = events.filter(event => event.date === selected)
   const monthEvents = events.filter(event => event.date.startsWith(`${year}-${String(month + 1).padStart(2, '0')}`))
-  const pendingCount = monthEvents.filter(event => ['pago', 'atrasado', 'impuesto', 'multa'].includes(event.type)).length
+  const pendingCount = monthEvents.filter(event => ['pago', 'pago_unico', 'pago_recurrente', 'pago_flexible', 'atrasado', 'impuesto', 'multa'].includes(event.type)).length
 
   const setMonth = (nextMonth: number) => setCursor(new Date(year, nextMonth, 1))
   const setYear = (nextYear: number) => setCursor(new Date(nextYear, month, 1))
@@ -180,7 +193,7 @@ export default function CalendarPage() {
       <div>
         <p className="font-display font-bold text-ink">Código de categorías</p>
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
-          {(['pago', 'atrasado', 'itv', 'mantenimiento', 'impuesto', 'multa', 'alquiler'] as EventType[]).map(type => <span key={type} className="inline-flex items-center gap-2 text-xs font-semibold text-stone-600"><span className={`size-2.5 rounded-full ${eventStyle[type].dot}`}/>{eventStyle[type].label}</span>)}
+          {(['pago_unico', 'pago_recurrente', 'pago_flexible', 'atrasado', 'itv', 'mantenimiento', 'impuesto', 'multa', 'alquiler'] as EventType[]).map(type => <span key={type} className="inline-flex items-center gap-2 text-xs font-semibold text-stone-600"><span className={`size-2.5 rounded-full ${eventStyle[type].dot}`}/>{eventStyle[type].label}</span>)}
         </div>
       </div>
       <Link to="/app/alertas" className="btn-secondary shrink-0">Ver todos los avisos</Link>

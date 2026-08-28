@@ -33,6 +33,7 @@ export default function ReportsPage(){
       <section className="reports-summary" aria-label="Resumen económico">
         <SummaryCard label="Ingresos cobrados" value={report.summary.totalPaid} detail={`${euro.format(report.summary.monthIncome)} este mes`} icon={ArrowUpRight} tone="income"/>
         <SummaryCard label="Ingresos pendientes" value={report.summary.totalPending} detail="Cobros todavía no recibidos" icon={CircleDollarSign} tone="secondary"/>
+        <SummaryCard label="Pagos flexibles" value={report.summary.flexiblePending} detail="Seguimiento manual" icon={CircleDollarSign} tone="secondary"/>
         <SummaryCard label="Dinero atrasado" value={report.summary.totalOverdue} detail="Requiere seguimiento" icon={AlertCircle} tone="overdue"/>
         <SummaryCard label="Gastos del mes" value={report.summary.monthExpenses} detail="Gastos realizados" icon={ArrowDownRight} tone="expense"/>
         <SummaryCard label="Beneficio estimado" value={report.summary.monthProfit} detail="Cobrado del mes menos gastos" icon={TrendingUp} tone="profit"/>
