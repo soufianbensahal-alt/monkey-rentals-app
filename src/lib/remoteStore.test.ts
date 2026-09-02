@@ -14,6 +14,7 @@ describe('remoteStore', () => {
     vi.unstubAllEnvs()
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
+    vi.useRealTimers()
   })
 
   it('inicia sesión con Supabase Auth y conserva el email', async () => {
@@ -34,6 +35,8 @@ describe('remoteStore', () => {
   })
 
   it('lee y guarda el estado aislado por usuario', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-15T10:01:00.000Z'))
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({
         ok: true,
@@ -41,7 +44,6 @@ describe('remoteStore', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => [{ updated_at: '2026-06-15T10:01:00.000Z' }],
       })
     vi.stubGlobal('fetch', fetchMock)
     const { fetchRemoteState, saveRemoteState } = await import('./remoteStore')
@@ -54,9 +56,23 @@ describe('remoteStore', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://supabase.test/rest/v1/fleet_state?user_id=eq.user-a&select=state,updated_at,user_id&limit=1', expect.any(Object))
     expect(fetchMock).toHaveBeenLastCalledWith('https://supabase.test/rest/v1/fleet_state?on_conflict=user_id', expect.objectContaining({
       method: 'POST',
-      headers: expect.objectContaining({ Authorization: 'Bearer token-1', Prefer: 'resolution=merge-duplicates,return=representation' }),
+      headers: expect.objectContaining({ Authorization: 'Bearer token-1', Prefer: 'resolution=merge-duplicates,return=minimal' }),
       body: expect.stringContaining('"user_id":"user-a"'),
     }))
+  })
+
+  it('comprueba cambios remotos sin descargar el estado completo', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [{ updated_at: '2026-06-15T10:00:00.000Z', user_id:'user-a' }],
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { fetchRemoteMeta } = await import('./remoteStore')
+
+    const meta = await fetchRemoteMeta({ accessToken:'token-1', userId:'user-a' })
+
+    expect(meta?.updated_at).toBe('2026-06-15T10:00:00.000Z')
+    expect(fetchMock).toHaveBeenCalledWith('https://supabase.test/rest/v1/fleet_state?user_id=eq.user-a&select=updated_at,user_id&limit=1', expect.any(Object))
   })
 
   it('rechaza lecturas remotas sin usuario identificable', async () => {

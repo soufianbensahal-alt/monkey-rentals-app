@@ -17,6 +17,11 @@ interface RemoteRow {
   user_id?: string
 }
 
+export interface RemoteMeta {
+  updated_at: string
+  user_id?: string
+}
+
 export const REMOTE_SESSION_KEY = 'monkey-rentals:supabase-session'
 export const REMOTE_REMEMBER_KEY = 'monkey-rentals:remember-session'
 
@@ -56,6 +61,10 @@ function headers(session?: RemoteSession, extraHeaders: Record<string, string> =
 
 function restUrl(query = '') {
   return `${config.url}/rest/v1/${config.table}${query}`
+}
+
+function ownerQuery(session: RemoteSession) {
+  return `user_id=eq.${encodeURIComponent(requireRemoteOwnerId(session))}`
 }
 
 export function readRemoteSession(): RemoteSession | null {
@@ -164,10 +173,16 @@ export async function signInRemote(email: string, password: string): Promise<Rem
 }
 
 export async function fetchRemoteState(session: RemoteSession): Promise<RemoteRow | null> {
-  const ownerId = requireRemoteOwnerId(session)
-  const response = await authedFetch(restUrl(`?user_id=eq.${encodeURIComponent(ownerId)}&select=state,updated_at,user_id&limit=1`), session)
+  const response = await authedFetch(restUrl(`?${ownerQuery(session)}&select=state,updated_at,user_id&limit=1`), session)
   if (!response.ok) throw new Error('No se han podido cargar los datos remotos.')
   const rows = await response.json() as RemoteRow[]
+  return rows[0] || null
+}
+
+export async function fetchRemoteMeta(session: RemoteSession): Promise<RemoteMeta | null> {
+  const response = await authedFetch(restUrl(`?${ownerQuery(session)}&select=updated_at,user_id&limit=1`), session)
+  if (!response.ok) throw new Error('No se ha podido comprobar el estado remoto.')
+  const rows = await response.json() as RemoteMeta[]
   return rows[0] || null
 }
 
@@ -177,8 +192,7 @@ export async function saveRemoteState(state: FleetState, session: RemoteSession)
   const response = await authedFetch(restUrl('?on_conflict=user_id'), session, {
     method: 'POST',
     body: JSON.stringify([{ id:remoteRowId(ownerId), user_id:ownerId, state, updated_at:updatedAt }]),
-  }, { Prefer: 'resolution=merge-duplicates,return=representation' })
+  }, { Prefer: 'resolution=merge-duplicates,return=minimal' })
   if (!response.ok) throw new Error('No se han podido guardar los datos remotos.')
-  const rows = await response.json() as RemoteRow[]
-  return rows[0]?.updated_at || updatedAt
+  return updatedAt
 }

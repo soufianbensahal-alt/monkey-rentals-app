@@ -1,13 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Monitor, Moon, ShieldCheck, Sun } from 'lucide-react'
 import { emptyState } from '../data/emptyState'
-import { fetchRemoteState, getRememberRemoteSession, getRemoteOwnerId, readRemoteSession, refreshRemoteSession, remoteEnabled, saveRemoteSession, saveRemoteState, setRememberRemoteSession, signInRemote, signOutRemote, type RemoteSession, type RemoteStatus } from '../lib/remoteStore'
+import { fetchRemoteMeta, fetchRemoteState, getRememberRemoteSession, getRemoteOwnerId, readRemoteSession, refreshRemoteSession, remoteEnabled, saveRemoteSession, saveRemoteState, setRememberRemoteSession, signInRemote, signOutRemote, type RemoteSession, type RemoteStatus } from '../lib/remoteStore'
 import { getNextPaymentDate } from '../lib/paymentReminders'
 import { applyLoginTheme, applyTheme, getSavedLoginThemeMode, getSavedTheme, saveLoginThemeMode, type ThemeMode } from '../lib/theme'
 import type { AdminSettings, CalendarEvent, ClientDocument, Customer, Document, Fine, FleetState, MaintenanceRecord, Payment, Rental, Task, Vehicle, VehicleTax } from '../types'
 
 export const STORAGE_KEY = 'monkey-rentals-flota:v4'
 const LEGACY_STORAGE_KEYS = ['monkey-rentals-flota:v3','monkey-rentals-flota:v2']
+const REMOTE_SAVE_DEBOUNCE_MS = 1200
+const REMOTE_REFRESH_INTERVAL_MS = 60000
+const REMOTE_REFRESH_MIN_GAP_MS = 10000
 type Entity = Vehicle | Customer | Rental | Payment | ClientDocument | Task | MaintenanceRecord | Document | VehicleTax | Fine | CalendarEvent
 type Collection = 'vehicles' | 'customers' | 'rentals' | 'payments' | 'clientDocuments' | 'tasks' | 'maintenance' | 'documents' | 'taxes' | 'fines' | 'events'
 type Action =
@@ -113,6 +116,12 @@ function readCachedState(key: string, includeLegacy = true): FleetState | null {
   return parseCachedState(stored)
 }
 
+function persistCachedState(key: string, nextState: FleetState) {
+  const serialized = JSON.stringify(nextState)
+  localStorage.setItem(key, serialized)
+  return serialized
+}
+
 function initialState(session: RemoteSession | null = null): FleetState {
   if (remoteEnabled && session) return readCachedState(storageKeyForSession(session), false) ?? structuredClone(emptyState)
   if (remoteEnabled) return structuredClone(emptyState)
@@ -189,6 +198,8 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   const hydrated = useRef(!remoteEnabled)
   const skipNextSave = useRef(false)
   const remoteUpdatedAt = useRef<string>('')
+  const lastSyncedState = useRef(JSON.stringify(state))
+  const lastRefreshAt = useRef(0)
   const stateRef = useRef(state)
 
   useEffect(() => { stateRef.current = state }, [state])
@@ -211,15 +222,16 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       if (remote) {
         const remoteState = normalizeState(remote.state)
         remoteUpdatedAt.current = remote.updated_at
+        lastSyncedState.current = JSON.stringify(remoteState)
         skipNextSave.current = true
         dispatch({ type:'hydrate', state:remoteState })
-        localStorage.setItem(cacheKey, JSON.stringify(remoteState))
+        localStorage.setItem(cacheKey, lastSyncedState.current)
       } else {
         const cachedState = readCachedState(cacheKey, false) ?? structuredClone(emptyState)
         initialCache.current = cachedState
         skipNextSave.current = true
         dispatch({ type:'hydrate', state:cachedState })
-        localStorage.setItem(cacheKey, JSON.stringify(cachedState))
+        lastSyncedState.current = persistCachedState(cacheKey, cachedState)
         remoteUpdatedAt.current = await saveRemoteState(cachedState, currentSession)
       }
       hydrated.current = true
@@ -253,37 +265,47 @@ export function FleetProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (remoteEnabled && !session) return
-    localStorage.setItem(storageKeyForSession(session), JSON.stringify(state))
+    const serializedState = persistCachedState(storageKeyForSession(session), state)
     if (!remoteEnabled || !session || !hydrated.current) return
     if (skipNextSave.current) {
       skipNextSave.current = false
+      if (serializedState === lastSyncedState.current) return
+    }
+    if (serializedState === lastSyncedState.current) {
       return
     }
     const timeout = window.setTimeout(async () => {
       setSyncStatus('saving')
       try {
         remoteUpdatedAt.current = await saveRemoteState(stateRef.current, session)
+        lastSyncedState.current = JSON.stringify(stateRef.current)
         setSyncStatus('online')
         setSyncError('')
       } catch (error) {
         setSyncStatus('offline')
         setSyncError(error instanceof Error ? error.message : 'Cambios guardados solo en caché local.')
       }
-    }, 650)
+    }, REMOTE_SAVE_DEBOUNCE_MS)
     return () => window.clearTimeout(timeout)
   }, [state, session])
 
   useEffect(() => {
     if (!remoteEnabled || !session) return
     const refresh = async () => {
+      const now = Date.now()
+      if (now - lastRefreshAt.current < REMOTE_REFRESH_MIN_GAP_MS) return
+      lastRefreshAt.current = now
       try {
-        const remote = await fetchRemoteState(session)
-        if (remote && remote.updated_at && remote.updated_at !== remoteUpdatedAt.current) {
+        const meta = await fetchRemoteMeta(session)
+        if (meta?.updated_at && meta.updated_at !== remoteUpdatedAt.current) {
+          const remote = await fetchRemoteState(session)
+          if (!remote) return
           const remoteState = normalizeState(remote.state)
           remoteUpdatedAt.current = remote.updated_at
+          lastSyncedState.current = JSON.stringify(remoteState)
           skipNextSave.current = true
           dispatch({ type:'hydrate', state:remoteState })
-          localStorage.setItem(storageKeyForSession(session), JSON.stringify(remoteState))
+          localStorage.setItem(storageKeyForSession(session), lastSyncedState.current)
         }
         setSyncStatus('online')
         setSyncError('')
@@ -297,10 +319,10 @@ export function FleetProvider({ children }: { children: ReactNode }) {
         setSyncStatus('offline')
       }
     }
-    const onFocus = () => void refresh()
+    const onFocus = () => { if (!document.hidden) void refresh() }
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onFocus)
-    const interval = window.setInterval(refresh, 15000)
+    const interval = window.setInterval(refresh, REMOTE_REFRESH_INTERVAL_MS)
     return () => { window.removeEventListener('focus', onFocus); document.removeEventListener('visibilitychange', onFocus); window.clearInterval(interval) }
   }, [session])
 
@@ -315,10 +337,12 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       const cachedState = readCachedState(cacheKey, false) ?? structuredClone(emptyState)
       initialCache.current = cachedState
       remoteUpdatedAt.current = ''
+      lastSyncedState.current = JSON.stringify(cachedState)
+      lastRefreshAt.current = 0
       hydrated.current = false
       skipNextSave.current = true
       dispatch({ type:'hydrate', state:cachedState })
-      localStorage.setItem(cacheKey, JSON.stringify(cachedState))
+      localStorage.setItem(cacheKey, lastSyncedState.current)
       setSyncError('')
       setSession(nextSession)
     } catch (error) {
@@ -332,6 +356,8 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     saveRemoteSession(null)
     initialCache.current = structuredClone(emptyState)
     remoteUpdatedAt.current = ''
+    lastSyncedState.current = JSON.stringify(emptyState)
+    lastRefreshAt.current = 0
     hydrated.current = !remoteEnabled
     skipNextSave.current = true
     dispatch({ type:'hydrate', state:structuredClone(emptyState) })

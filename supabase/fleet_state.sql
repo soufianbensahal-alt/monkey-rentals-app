@@ -11,6 +11,9 @@ alter table public.fleet_state
 create unique index if not exists fleet_state_user_id_key
   on public.fleet_state (user_id);
 
+create index if not exists fleet_state_user_id_updated_at_idx
+  on public.fleet_state (user_id, updated_at desc);
+
 alter table public.fleet_state enable row level security;
 alter table public.fleet_state force row level security;
 
