@@ -105,7 +105,7 @@ export default function PaymentsPage() {
     </section>
     {state.payments.length > 0 && <>
       <div className="mt-5 flex flex-wrap gap-2">{['todos', 'pendiente', 'atrasado', 'flexible', 'pagado', 'cancelado'].map(value => <button key={value} className={`min-h-10 rounded-xl px-4 text-sm font-bold capitalize ${filter === value ? 'bg-brand-500 text-white' : 'border border-orange-100 bg-white text-stone-600'}`} onClick={() => setFilter(value)}>{value}</button>)}</div>
-      <label className="group relative my-4 block max-w-2xl"><span className="sr-only">Buscar pagos</span><input className="field pr-11" value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar cliente, vehículo, fecha, tipo o estado"/>{!query && <Search className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-brand-500 group-focus-within:hidden" size={18}/>}</label>
+      <label className="group relative my-4 block max-w-2xl"><span className="sr-only">Buscar pagos</span><input className="field search-field" value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar pago o estado"/>{!query && <Search className="search-icon pointer-events-none absolute top-1/2 -translate-y-1/2 text-brand-500 group-focus-within:hidden" size={18}/>}</label>
     </>}
     <div className="table-shell mt-5">
       {state.payments.length ? rows.length ? <table className="data-table">
@@ -117,7 +117,7 @@ export default function PaymentsPage() {
           <td><Badge tone={flexible && status !== 'pagado' ? 'info' : tones[status]}>{flexible && status !== 'pagado' ? 'flexible' : status}</Badge></td>
           <td>{paymentReminderLabel(payment)}</td>
           <td className="font-bold">{euro.format(payment.amount)}</td>
-          <td><div className="flex items-center gap-3">{status !== 'pagado' && status !== 'cancelado' && <button className="btn-primary min-h-9 px-3 py-1 text-xs" onClick={() => markPaymentPaid(payment.id)}><Check size={15}/> Pagado</button>}<button onClick={() => open(payment)} aria-label="Editar pago" className="text-stone-500 hover:text-brand-600"><Pencil size={18}/></button><ConfirmButton onConfirm={() => remove('payments', payment.id)}/></div></td>
+          <td><div className="flex items-center gap-3">{status !== 'pagado' && status !== 'cancelado' && <button className="btn-primary min-h-9 px-3 py-1 text-xs" onClick={() => markPaymentPaid(payment.id)}><Check size={15}/> Pagado</button>}<button onClick={() => open(payment)} aria-label="Editar pago" className="text-stone-500 hover:text-brand-600"><Pencil size={18}/></button><ConfirmButton title="Eliminar pago" message="¿Seguro que quieres eliminar este pago? Esta acción no se puede deshacer." onConfirm={() => remove('payments', payment.id)}/></div></td>
         </tr>)}</tbody>
       </table> : <EmptyState title="No hay pagos que coincidan." description="Ajusta la búsqueda o cambia el filtro para ver más resultados."/> : <EmptyState title="No hay pagos registrados." description="Los pagos creados desde alquileres aparecerán aquí." action={state.rentals.length ? <button className="btn-primary" onClick={() => open(blank())}><Plus size={18}/> Registrar pago</button> : undefined}/>}
     </div>

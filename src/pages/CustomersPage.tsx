@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useState, type FormEvent } from 'react'
-import { Building2, Download, Eye, FileText, Mail, Pencil, Phone, Plus, Search, Trash2, Upload, User } from 'lucide-react'
+import { Building2, Download, Eye, FileText, Mail, Pencil, Phone, Plus, Search, Upload, User } from 'lucide-react'
 import { Badge, ConfirmButton, EmptyState, Modal, PageHeader } from '../components/ui'
 import { useFleet } from '../store/FleetContext'
 import { date, euro, uid } from '../lib/format'
@@ -89,8 +89,8 @@ export default function CustomersPage() {
     />
     {state.customers.length > 0 && <label className="group relative mb-5 block max-w-xl">
       <span className="sr-only">Buscar cliente</span>
-      <input className="field pr-11" value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar nombre, teléfono, email o documento"/>
-      {!query && <Search className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-brand-500 group-focus-within:hidden" size={18}/>}
+      <input className="field search-field" value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar cliente o documento"/>
+      {!query && <Search className="search-icon pointer-events-none absolute top-1/2 -translate-y-1/2 text-brand-500 group-focus-within:hidden" size={18}/>}
     </label>}
 
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -109,7 +109,7 @@ export default function CustomersPage() {
             <div className="flex items-center gap-2">
               {customer.phone && <a href={phoneHref} aria-label={`Llamar a ${customer.name}`} title={`Llamar a ${customer.phone}`} className="customer-call-button"><Phone size={18}/><span>Llamar</span></a>}
               <button onClick={() => setEditing(customer)} aria-label={`Editar ${customer.name}`} className="grid size-10 place-items-center rounded-xl text-stone-500 transition hover:bg-brand-50 hover:text-brand-600"><Pencil size={18}/></button>
-              <ConfirmButton onConfirm={() => remove('customers', customer.id)}/>
+              <ConfirmButton title="Eliminar cliente" message="¿Seguro que quieres eliminar este cliente? Esta acción no se puede deshacer." onConfirm={() => remove('customers', customer.id)}/>
             </div>
           </div>
           <h2 className="mt-4 font-display text-lg font-bold">{customer.name}</h2>
@@ -192,7 +192,12 @@ function CustomerDocuments({ documents, onAdd, onDelete }: { documents: ClientDo
         <div className="mt-3 flex flex-wrap gap-2">
           <a className="btn-secondary min-h-9 px-3 py-1.5 text-xs" href={document.dataUrl} target="_blank" rel="noreferrer"><Eye size={15}/> Ver</a>
           <a className="btn-secondary min-h-9 px-3 py-1.5 text-xs" href={document.dataUrl} download={document.fileName}><Download size={15}/> Descargar</a>
-          <button className="btn-secondary min-h-9 px-3 py-1.5 text-xs text-red-700" type="button" onClick={() => onDelete(document.id)}><Trash2 size={15}/> Eliminar</button>
+          <ConfirmButton
+            className="btn-secondary min-h-9 px-3 py-1.5 text-xs text-red-700"
+            title="Eliminar documento"
+            message="¿Seguro que quieres eliminar este documento del cliente? Esta acción no se puede deshacer."
+            onConfirm={() => onDelete(document.id)}
+          />
         </div>
       </article>)}
     </div> : <div className="mt-4 rounded-xl border border-dashed border-orange-200 bg-white/70 p-4 text-center">

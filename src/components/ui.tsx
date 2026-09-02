@@ -1,5 +1,5 @@
 import { X, Inbox, type LucideIcon } from 'lucide-react'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 export function Badge({ children, tone='neutral' }: { children:ReactNode; tone?:'success'|'warning'|'danger'|'info'|'neutral' }) {
@@ -41,4 +41,39 @@ export function Modal({ title, children, onClose }: { title:string; children:Rea
 
 export function EmptyState({ title, description, action }: { title:string; description:string; action?:ReactNode }) { return <div className="grid min-h-56 place-items-center p-8 text-center"><div><span className="mx-auto grid size-12 place-items-center rounded-2xl bg-brand-50 text-brand-600"><Inbox/></span><h3 className="mt-4 font-bold text-ink">{title}</h3><p className="mt-1 text-sm text-stone-500">{description}</p>{action&&<div className="mt-5">{action}</div>}</div></div> }
 
-export function ConfirmButton({ onConfirm, label='Eliminar' }: { onConfirm:()=>void; label?:string }) { return <button className="cursor-pointer font-semibold text-red-600 hover:text-red-800" onClick={onConfirm}>{label}</button> }
+export function ConfirmButton({
+  onConfirm,
+  label = 'Eliminar',
+  title = 'Eliminar registro',
+  message = '¿Seguro que quieres eliminar este registro? Esta acción no se puede deshacer.',
+  confirmLabel = 'Eliminar',
+  className = 'cursor-pointer font-semibold text-red-600 transition hover:text-red-800',
+  children,
+}: {
+  onConfirm: () => void
+  label?: string
+  title?: string
+  message?: string
+  confirmLabel?: string
+  className?: string
+  children?: ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  const confirm = () => {
+    onConfirm()
+    setOpen(false)
+  }
+
+  return <>
+    <button type="button" className={className} onClick={() => setOpen(true)}>{children || label}</button>
+    {open && <Modal title={title} onClose={() => setOpen(false)}>
+      <div className="confirm-dialog">
+        <p className="text-sm leading-6 text-stone-600">{message}</p>
+        <div className="confirm-actions mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>Cancelar</button>
+          <button type="button" className="btn-danger" onClick={confirm}>{confirmLabel}</button>
+        </div>
+      </div>
+    </Modal>}
+  </>
+}
