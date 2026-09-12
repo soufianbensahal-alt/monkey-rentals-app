@@ -13,21 +13,26 @@ const COLORS = ['#f04438','#f97316','#0f766e','#d97706','#64748b','#78716c']
 const monthLabel = (value:string) => monthFormatter.format(new Date(`${value}-01T12:00:00`)).replace('.','')
 
 export default function ReportsPage(){
-  const {state}=useFleet()
+  const {state,authEmail,syncStatus}=useFleet()
   const [exportMessage,setExportMessage]=useState('')
+  const [exporting,setExporting]=useState(false)
   const report=useMemo(()=>buildReport(state),[state])
   const vehicleName=(id?:string)=>id?vehicleLabel(state.vehicles.find(item=>item.id===id)):'Sin datos'
   const hasData=report.hasEconomicData
   const exportExcel=async()=>{
+    if (exporting || syncStatus === 'loading') return
+    setExporting(true)
     setExportMessage('')
     try {
-      const exported=await downloadReportExcel(state)
+      const exported=await downloadReportExcel(state, undefined, authEmail)
       setExportMessage(exported?'Excel generado correctamente.':'No hay datos para exportar.')
     } catch {
       setExportMessage('No se ha podido generar el Excel.')
+    } finally {
+      setExporting(false)
     }
   }
-  return <div className="fade-up reports-page"><PageHeader eyebrow="Inteligencia de negocio" title="Informes" description="Ingresos, gastos y rentabilidad calculados a partir de los movimientos registrados en la app." action={<button className="btn-primary" disabled={!hasData} onClick={exportExcel} title={hasData?'Descargar informe Excel':'No hay datos para exportar'}><Download size={18}/> Exportar Excel</button>}/>
+  return <div className="fade-up reports-page"><PageHeader eyebrow="Inteligencia de negocio" title="Informes" description="Ingresos, gastos y rentabilidad calculados a partir de los movimientos registrados en la app." action={<button className="btn-primary" disabled={exporting || syncStatus === 'loading'} onClick={exportExcel} title="Descargar informe Excel"><Download size={18}/> {exporting ? 'Generando Excel…' : 'Exportar Excel'}</button>}/>
     {exportMessage&&<p role="status" className="mb-4 rounded-2xl border border-orange-100 bg-brand-50/60 px-4 py-3 text-sm font-semibold text-stone-700">{exportMessage}</p>}
     {!hasData?<section className="card"><EmptyState title="No hay datos suficientes para generar informes." description="Cuando registres pagos, gastos de mantenimiento, ITV o impuestos, aparecerán aquí tus gráficos e indicadores."/></section>:<>
       <section className="reports-summary" aria-label="Resumen económico">
