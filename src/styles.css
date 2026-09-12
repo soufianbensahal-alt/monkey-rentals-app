@@ -63,6 +63,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .report-summary-card > div { @apply min-w-0; }
 .report-summary-card p { @apply text-sm font-semibold text-stone-500; }
 .report-summary-card strong { @apply mt-3 block font-display text-2xl font-bold tabular-nums text-ink; }
+.report-summary-card strong.report-overdue-zero { @apply text-emerald-700; }
+.report-summary-card strong.report-overdue-positive { @apply text-red-600; }
 .report-summary-card span { @apply mt-2 block text-xs font-medium text-stone-500; }
 .report-summary-card i { @apply grid size-10 shrink-0 place-items-center rounded-xl not-italic; }
 .report-summary-income { @apply border-orange-100 text-brand-600; }

@@ -101,7 +101,7 @@ export default function PaymentsPage() {
       <StatCard label="Cobrado" value={euro.format(paid)} detail="Pagos registrados" icon={Check} tone="green"/>
       <StatCard label="Por cobrar" value={euro.format(pending)} detail="Pendientes y flexibles" icon={CreditCard}/>
       <StatCard label="Flexible" value={euro.format(flexible)} detail="Requiere seguimiento manual" icon={CreditCard} tone="blue"/>
-      <StatCard label="Dinero atrasado" value={euro.format(overdue)} detail={`${decorated.filter(item => item.status === 'atrasado').length} pagos requieren seguimiento`} icon={CreditCard} tone="red"/>
+      <StatCard label="Dinero atrasado" value={euro.format(overdue)} detail={`${decorated.filter(item => item.status === 'atrasado').length} pagos requieren seguimiento`} icon={CreditCard} tone="red" valueTone={overdue === 0 ? 'green' : 'red'}/>
     </section>
     {state.payments.length > 0 && <>
       <div className="mt-5 flex flex-wrap gap-2">{['todos', 'pendiente', 'atrasado', 'flexible', 'pagado', 'cancelado'].map(value => <button key={value} className={`min-h-10 rounded-xl px-4 text-sm font-bold capitalize ${filter === value ? 'bg-brand-500 text-white' : 'border border-orange-100 bg-white text-stone-600'}`} onClick={() => setFilter(value)}>{value}</button>)}</div>

@@ -120,7 +120,7 @@ export default function CustomersPage() {
           </div>
           <div className="mt-5 grid grid-cols-3 gap-2 border-t border-orange-100 pt-4 text-center">
             <div><p className="font-bold">{rentals.length}</p><p className="text-[11px] text-stone-500">Alquileres</p></div>
-            <div><p className="font-bold text-red-700">{euro.format(overdue)}</p><p className="text-[11px] text-stone-500">Atrasado</p></div>
+            <div><p className={`font-bold ${overdue === 0 ? 'text-emerald-700' : 'text-red-700'}`}>{euro.format(overdue)}</p><p className="text-[11px] text-stone-500">Atrasado</p></div>
             <div><p className="font-bold">{fines.length}</p><p className="text-[11px] text-stone-500">Multas</p></div>
           </div>
           {(rentals.some(rental => rental.status === 'activo') || futureReservation) && <div className="mt-4 flex flex-wrap gap-2">

@@ -13,9 +13,9 @@ export function PageHeader({ eyebrow, title, description, action }: { eyebrow?:s
   </div>
 }
 
-export function StatCard({ label, value, detail, icon:Icon, tone='orange' }: { label:string; value:string; detail:string; icon:LucideIcon; tone?:'orange'|'green'|'blue'|'red' }) {
+export function StatCard({ label, value, detail, icon:Icon, tone='orange', valueTone }: { label:string; value:string; detail:string; icon:LucideIcon; tone?:'orange'|'green'|'blue'|'red'; valueTone?:'green'|'red' }) {
   const tones = { orange:'bg-brand-50 text-brand-600', green:'bg-emerald-50 text-emerald-700', blue:'bg-blue-50 text-blue-700', red:'bg-red-50 text-red-700' }
-  return <article className="card p-5"><div className="flex items-start justify-between"><div><p className="text-sm font-medium text-stone-500">{label}</p><p className="mt-2 font-display text-3xl font-bold tabular-nums text-ink">{value}</p></div><span className={`grid size-11 place-items-center rounded-xl ${tones[tone]}`}><Icon size={21} aria-hidden="true" /></span></div><p className="mt-3 text-xs font-medium text-stone-500">{detail}</p></article>
+  return <article className="card p-5"><div className="flex items-start justify-between"><div><p className="text-sm font-medium text-stone-500">{label}</p><p className={`mt-2 font-display text-3xl font-bold tabular-nums ${valueTone === 'green' ? 'text-emerald-700' : valueTone === 'red' ? 'text-red-700' : 'text-ink'}`}>{value}</p></div><span className={`grid size-11 place-items-center rounded-xl ${tones[tone]}`}><Icon size={21} aria-hidden="true" /></span></div><p className="mt-3 text-xs font-medium text-stone-500">{detail}</p></article>
 }
 
 export function Modal({ title, children, onClose }: { title:string; children:ReactNode; onClose:()=>void }) {
