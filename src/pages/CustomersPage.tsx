@@ -142,7 +142,7 @@ export default function CustomersPage() {
     {editing && <Modal title={editing.id ? 'Editar cliente' : 'Nuevo cliente'} onClose={() => setEditing(null)}>
       <form className="grid gap-4 sm:grid-cols-2" onSubmit={saveCustomer}>
         <Field label="Nombre completo" name="name" value={editing.name} required/>
-        <Field label="DNI / NIE (opcional)" name="dni" value={editing.dni}/>
+        <Field label="DNI / NIE / CIF (opcional)" name="dni" value={editing.dni}/>
         <Field label="Email (opcional)" name="email" type="email" value={editing.email}/>
         <Field label="Teléfono (opcional)" name="phone" type="tel" value={editing.phone}/>
         <div className="sm:col-span-2"><Field label="Empresa (opcional)" name="company" value={editing.company || ''}/></div>

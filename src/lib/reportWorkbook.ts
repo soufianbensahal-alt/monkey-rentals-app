@@ -171,7 +171,7 @@ export function buildReportWorkbook(state: FleetState, today: string, generatedB
     const expense = sum(paidExpenses.filter(item => item.vehicleId === v.id))
     return [text(v.plate), text(v.brand), text(v.model), number(v.year), text(v.category), status(info.label.toLowerCase()), text(info.status === 'alquilado' ? info.customer?.name : ''), date(next?.startDate), money(v.dailyRate), money(v.weeklyRate), money(v.monthlyRate), number(v.includedKmPerDay), money(v.extraKmRate), money(Math.round(v.extraKmRate * 1.21 * 100) / 100), money(income, colors.green), money(expense), profit(income - expense), text(v.notes)]
   }), [total('Total vehículos', number(state.vehicles.length)), total('Ingresos de la flota actual', money(sum(incomes.filter(item => !!item.vehicleId && vehicles.has(item.vehicleId) && item.status === 'pagado')))), total('Gastos de la flota actual', money(sum(paidExpenses.filter(item => !!item.vehicleId && vehicles.has(item.vehicleId)))))]))
-  sheets.push(table('Clientes', ['Nombre', 'Teléfono', 'Email', 'Documento / DNI', 'Número de alquileres', 'Alquiler activo', 'Vehículo actual', 'Reservas futuras', 'Total pagado', 'Total pendiente', 'Total atrasado', 'Multas vinculadas', 'Documentos subidos', 'Notas'], state.customers.map(c => {
+  sheets.push(table('Clientes', ['Nombre', 'Teléfono', 'Email', 'DNI / NIE / CIF', 'Número de alquileres', 'Alquiler activo', 'Vehículo actual', 'Reservas futuras', 'Total pagado', 'Total pendiente', 'Total atrasado', 'Multas vinculadas', 'Documentos subidos', 'Notas'], state.customers.map(c => {
     const related = state.rentals.filter(r => r.customerId === c.id)
     const active = related.filter(isActive)
     const income = incomes.filter(item => item.customerId === c.id)
