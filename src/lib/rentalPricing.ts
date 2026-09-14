@@ -1,15 +1,15 @@
 import type { PricePeriod, Vehicle } from '../types'
 
-export type RentalBillingPeriod = Exclude<PricePeriod, 'otro'>
+export type RentalBillingPeriod = PricePeriod
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
 export function normalizeBillingPeriod(period: PricePeriod): RentalBillingPeriod {
-  return period === 'dia' || period === 'semana' || period === 'mes' ? period : 'mes'
+  return period === 'dia' || period === 'semana' || period === 'mes' || period === 'otro' ? period : 'mes'
 }
 
 export function getRentalRate(vehicle: Vehicle | undefined, period: RentalBillingPeriod): number | null {
-  if (!vehicle) return null
+  if (!vehicle || period === 'otro') return null
   const rate = period === 'dia' ? vehicle.dailyRate : period === 'semana' ? vehicle.weeklyRate : vehicle.monthlyRate
   return Number.isFinite(rate) && rate > 0 ? rate : null
 }

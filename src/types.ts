@@ -21,6 +21,8 @@ export interface Vehicle {
   monthlyRate: number
   includedKmPerDay: number
   extraKmRate: number
+  currentKm?: number
+  lastKmUpdate?: string
   status: VehicleStatus
   image?: string
   notes: string
@@ -36,7 +38,28 @@ export interface Customer {
   rentals: number
 }
 
-export interface Rental {
+export interface RentalMileage {
+  kmStart?: number
+  kmEnd?: number
+  kmUsed?: number
+  kmIncludedTotal?: number
+  kmIncludedUnit?: 'total' | 'dia' | 'semana' | 'mes'
+  kmIncludedPerUnit?: number
+  kmIncludedPeriods?: number
+  kmExtraEnabled?: boolean
+  kmExtraPrice?: number
+  kmExtraDefaultPrice?: number
+  kmExtraVatRate?: number
+  kmExtraUsed?: number
+  kmExtraBaseAmount?: number
+  kmExtraVatAmount?: number
+  kmExtraTotalAmount?: number
+  kmExtraPaymentId?: string
+  returnCondition?: string
+  returnNotes?: string
+}
+
+export interface Rental extends RentalMileage {
   id: string
   vehicleId: string
   customerId: string
@@ -62,6 +85,12 @@ export interface Payment {
   amount: number
   status: PaymentStatus
   type?: PaymentType
+  kmExtraRelated?: number
+  kmExtraPrice?: number
+  kmExtraVatRate?: number
+  kmExtraBaseAmount?: number
+  kmExtraVatAmount?: number
+  mileageCharge?: boolean
   reminderEnabled?: boolean
   reminderDate?: string
   reminderFrequency?: ReminderFrequency

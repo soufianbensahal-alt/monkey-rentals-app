@@ -2,10 +2,11 @@ import { useMemo, useState } from 'react'
 import { AlertCircle, ArrowDownRight, ArrowUpRight, Car, CircleDollarSign, Download, TrendingUp } from 'lucide-react'
 import { Bar, CartesianGrid, Cell, ComposedChart, Legend, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Badge, EmptyState, PageHeader } from '../components/ui'
-import { date, euro } from '../lib/format'
+import { date, euro, euroWithCents } from '../lib/format'
 import { downloadReportExcel } from '../lib/reportExcel'
 import { buildReport, type EconomicMovement } from '../lib/reports'
 import { vehicleLabel } from '../lib/vehicles'
+import { MileageOverview } from '../components/MileageOverview'
 import { useFleet } from '../store/FleetContext'
 
 const monthFormatter = new Intl.DateTimeFormat('es-ES',{month:'short',year:'2-digit'})
@@ -34,6 +35,7 @@ export default function ReportsPage(){
   }
   return <div className="fade-up reports-page"><PageHeader eyebrow="Inteligencia de negocio" title="Informes" description="Ingresos, gastos y rentabilidad calculados a partir de los movimientos registrados en la app." action={<button className="btn-primary" disabled={exporting || syncStatus === 'loading'} onClick={exportExcel} title="Descargar informe Excel"><Download size={18}/> {exporting ? 'Generando Excel…' : 'Exportar Excel'}</button>}/>
     {exportMessage&&<p role="status" className="mb-4 rounded-2xl border border-orange-100 bg-brand-50/60 px-4 py-3 text-sm font-semibold text-stone-700">{exportMessage}</p>}
+    <MileageOverview state={state}/>
     {!hasData?<section className="card"><EmptyState title="No hay datos suficientes para generar informes." description="Cuando registres pagos, gastos de mantenimiento, ITV o impuestos, aparecerán aquí tus gráficos e indicadores."/></section>:<>
       <section className="reports-summary" aria-label="Resumen económico">
         <SummaryCard label="Ingresos cobrados" value={report.summary.totalPaid} detail={`${euro.format(report.summary.monthIncome)} este mes`} icon={ArrowUpRight} tone="income"/>
@@ -57,4 +59,4 @@ function SummaryCard({label,value,detail,icon:Icon,tone,text=false}:{label:strin
 function PanelTitle({title,description}:{title:string;description:string}){return <div><h2 className="font-display text-xl font-bold text-ink">{title}</h2><p className="mt-1 text-sm text-stone-500">{description}</p></div>}
 function MonthlyTooltip({active,payload,label}:{active?:boolean;payload?:Array<{name:string;value:number;color:string}>;label?:string}){if(!active||!payload?.length||!label)return null;return <div className="report-tooltip"><strong>{monthLabel(label)}</strong>{payload.map(item=><p key={item.name}><span style={{background:item.color}}/>{item.name}<b>{euro.format(item.value)}</b></p>)}</div>}
 function ExpenseTooltip({active,payload}:{active?:boolean;payload?:Array<{name:string;value:number;color:string}>}){const item=payload?.[0];if(!active||!item)return null;return <div className="report-tooltip"><strong>{item.name}</strong><p><span style={{background:item.color}}/>Gasto<b>{euro.format(item.value)}</b></p></div>}
-function MovementRow({item,vehicle,customer}:{item:EconomicMovement;vehicle:string;customer?:string}){const tone=item.status==='pagado'||item.status==='registrado'?'success':item.status==='atrasado'?'danger':'warning';return <tr><td>{date(item.date)}</td><td><span className={`report-kind report-kind-${item.kind}`}>{item.kind==='ingreso'?<ArrowUpRight size={14}/>:<ArrowDownRight size={14}/>} {item.category}</span></td><td className="font-semibold text-ink">{vehicle}</td><td>{customer||'—'}</td><td className={`font-bold tabular-nums ${item.kind==='ingreso'?'text-brand-600':'text-red-600'}`}>{item.kind==='ingreso'?'+':'−'} {euro.format(item.amount)}</td><td><Badge tone={tone}>{item.status}</Badge></td></tr>}
+function MovementRow({item,vehicle,customer}:{item:EconomicMovement;vehicle:string;customer?:string}){const tone=item.status==='pagado'||item.status==='registrado'?'success':item.status==='atrasado'?'danger':'warning';return <tr><td>{date(item.date)}</td><td><span className={`report-kind report-kind-${item.kind}`}>{item.kind==='ingreso'?<ArrowUpRight size={14}/>:<ArrowDownRight size={14}/>} {item.category}</span></td><td className="font-semibold text-ink">{vehicle}</td><td>{customer||'—'}</td><td className={`font-bold tabular-nums ${item.kind==='ingreso'?'text-brand-600':'text-red-600'}`}>{item.kind==='ingreso'?'+':'−'} {item.category === 'Km extra' ? euroWithCents.format(item.amount) : euro.format(item.amount)}</td><td><Badge tone={tone}>{item.status}</Badge></td></tr>}

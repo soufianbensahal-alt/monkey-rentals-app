@@ -48,4 +48,16 @@ describe('FleetContext',()=>{
     expect(result.current.state.payments).toHaveLength(1)
     expect(result.current.state.payments[0].status).toBe('pagado')
   })
+
+  it('no repite un cargo de km extra ni altera la siguiente cuota del alquiler',()=>{
+    const {result}=renderHook(()=>useFleet(),{wrapper:FleetProvider})
+    act(()=>{
+      result.current.upsert('rentals',{id:'r1',vehicleId:'v1',customerId:'c1',startDate:'2026-09-01',agreedPrice:500,pricePeriod:'mes',expectedKilometers:0,nextPaymentDate:'2026-10-01',status:'activo',notes:''})
+      result.current.upsert('payments',{id:'extra',rentalId:'r1',dueDate:'2026-09-05',amount:27.23,status:'pendiente',type:'km_extra',reminderEnabled:true,reminderFrequency:'monthly',recurrenceType:'recurrente',notes:''})
+    })
+    act(()=>result.current.markPaymentPaid('extra'))
+    expect(result.current.state.payments).toHaveLength(1)
+    expect(result.current.state.payments[0].status).toBe('pagado')
+    expect(result.current.state.rentals[0].nextPaymentDate).toBe('2026-10-01')
+  })
 })

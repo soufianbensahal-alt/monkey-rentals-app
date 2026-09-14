@@ -1,6 +1,7 @@
 import type { CellObject, Feature, Row, Sheet } from 'write-excel-file/browser'
 import { findElement, getCellAddress, getOrderOfSiblings, insertElementMarkupAccordingToOrderOfSiblings } from 'write-excel-file/utility'
 import type { FleetState, Rental } from '../types'
+import { calculateMileage, getVehicleMileage, mileageReport } from './mileage'
 import { buildReport, economicMovements, type EconomicMovement } from './reports'
 import { getVehicleStatusMap } from './vehicleStatus'
 import { vehicleLabel } from './vehicles'
@@ -202,5 +203,32 @@ export function buildReportWorkbook(state: FleetState, today: string, generatedB
   ]
   recentRows.sort((a, b) => b.date.localeCompare(a.date))
   sheets.push(table('Últimos movimientos', ['Fecha', 'Tipo', 'Vehículo', 'Cliente', 'Importe', 'Estado', 'Origen del movimiento', 'Notas'], recentRows.map(item => item.row), [total('Total movimientos económicos y operativos', number(recentRows.length)), total('Total ingresos (todos los estados)', money(sum(incomes))), total('Total gastos (todos los estados)', money(sum(expenses))), total('Balance realizado', profit(summary.totalPaid - sum(paidExpenses)))]))
+  const appendColumns = (name: string, labels: string[], extras: Row[]) => {
+    const index = sheets.findIndex(s => s.sheet === name)
+    const original = sheets[index]
+    const existingLabels = original.data[0].map(cell => String((cell as CellObject).value))
+    const body = extras.map((extra, i) => [...original.data[i + 1], ...extra])
+    const footer = original.data.slice((extras.length || 1) + 2).filter(row => row.length).map(row => [row[0], row[row.length - 1]])
+    sheets[index] = table(name, [...existingLabels, ...labels], body, footer)
+  }
+  appendColumns('Alquileres', ['Km iniciales', 'Km finales', 'Km realizados', 'Km incluidos', 'Cálculo extra activado', 'Km extra', 'Precio km extra sin IVA', 'IVA (%)', 'Base km extra', 'IVA km extra', 'Total km extra', 'Pago km extra', 'Estado de devolución', 'Notas de devolución'], state.rentals.map(r => {
+    const km = calculateMileage(r, vehicles.get(r.vehicleId))
+    return [r.kmStart === undefined ? text() : number(r.kmStart), r.kmEnd === undefined ? text() : number(r.kmEnd), km.used === undefined ? text() : number(km.used), r.kmIncludedTotal === undefined ? text() : number(r.kmIncludedTotal), text(r.kmExtraEnabled ? 'Sí' : 'No'), km.extra === undefined ? text() : number(km.extra), km.price === undefined ? text() : money(km.price), number(km.vatRate), km.base === undefined ? text() : money(km.base), km.vat === undefined ? text() : money(km.vat), km.total === undefined ? text() : money(km.total), text(r.kmExtraPaymentId), text(r.returnCondition), text(r.returnNotes)]
+  }))
+  appendColumns('Vehículos', ['Kilometraje actual', 'Última actualización de km', 'Km realizados en alquileres'], state.vehicles.map(v => {
+    const km = getVehicleMileage(state, v.id)
+    return [km.currentKm === undefined ? text() : number(km.currentKm), date(km.lastKmUpdate), number(km.totalUsed)]
+  }))
+  appendColumns('Clientes', ['Km realizados', 'Km extra acumulados', 'Cobrado por km extra'], state.customers.map(c => {
+    const related = state.rentals.filter(r => r.customerId === c.id && r.status !== 'cancelado')
+    const ids = new Set(related.map(r => r.id))
+    return [number(related.reduce((n, r) => n + (calculateMileage(r).used || 0), 0)), number(related.reduce((n, r) => n + (calculateMileage(r).extra || 0), 0)), money(state.payments.filter(p => ids.has(p.rentalId) && p.type === 'km_extra' && p.status === 'pagado').reduce((n, p) => n + p.amount, 0))]
+  }))
+  appendColumns('Ingresos', ['Km extra facturados', 'Base km extra', 'IVA km extra'], incomes.map(item => {
+    const p = payments.get(item.id)
+    return [p?.kmExtraRelated === undefined ? text() : number(p.kmExtraRelated), p?.kmExtraBaseAmount === undefined ? text() : money(p.kmExtraBaseAmount), p?.kmExtraVatAmount === undefined ? text() : money(p.kmExtraVatAmount)]
+  }))
+  const kmReport = mileageReport(state, today)
+  summaryRows.push([], header(['Kilometraje e ingresos adicionales', 'Total']), total('Ingresos por km extra', money(kmReport.totalPaid)), total('Km extra pendientes de cobro', money(kmReport.pending)), total('Ingresos km extra del mes', money(kmReport.monthIncome)), total('Vehículo con más km extra', text(kmReport.topVehicleId ? vname(kmReport.topVehicleId) : 'Sin excesos')), total('Cliente con más km extra', text(kmReport.topCustomerId ? cname(kmReport.topCustomerId) : 'Sin excesos')), total('Alquileres sin km finales', number(kmReport.missing.length)), [], header(['Mes de cobro', 'Km extra cobrados', 'Ingresos km extra']), ...kmReport.monthly.map(m => [{ ...date(`${m.month}-01`), format:'mm/yyyy' }, number(m.km), money(m.income)]))
   return sheets
 }

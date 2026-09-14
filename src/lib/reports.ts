@@ -31,7 +31,7 @@ const documentCategory = (type: string): ExpenseCategory => /itv/i.test(type) ? 
 
 export function economicMovements(state: FleetState, today = new Date().toISOString().slice(0, 10)): EconomicMovement[] {
   const rentals = new Map(state.rentals.map(item => [item.id, item]))
-  const rentalIdsWithPayments = new Set(state.payments.map(item => item.rentalId))
+  const rentalIdsWithPayments = new Set(state.payments.filter(item => item.type !== 'km_extra').map(item => item.rentalId))
   const payments: EconomicMovement[] = state.payments.filter(item => Number(item.amount) > 0 && item.status !== 'cancelado').map(item => {
     const rental = rentals.get(item.rentalId)
     const status = item.status === 'pagado' || item.status === 'flexible' || item.status === 'atrasado' ? item.status : item.dueDate < today ? 'atrasado' : 'pendiente'

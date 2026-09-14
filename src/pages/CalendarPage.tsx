@@ -20,6 +20,7 @@ import { Modal, PageHeader } from '../components/ui'
 import { date, euro, uid } from '../lib/format'
 import { effectivePaymentStatus } from '../lib/payments'
 import { isFlexiblePayment, paymentReminderLabel } from '../lib/paymentReminders'
+import { missingFinalMileage } from '../lib/mileage'
 import { vehicleLabel } from '../lib/vehicles'
 import type { CalendarEvent } from '../types'
 
@@ -85,7 +86,7 @@ export default function CalendarPage() {
         id: `payment-${payment.id}`,
         date: payment.dueDate,
         title: status === 'atrasado' ? `${customer?.name || 'Cliente'} · pago atrasado` : `Pago ${vehicleLabel(vehicle)}`,
-        detail: `${euro.format(payment.amount)} · ${customer?.name || 'Cliente'} · ${paymentReminderLabel(payment)}`,
+        detail: `${payment.type === 'km_extra' ? 'Km extra · ' : ''}${euro.format(payment.amount)} · ${customer?.name || 'Cliente'} · ${paymentReminderLabel(payment)}`,
         type,
       }
     }),
@@ -94,6 +95,7 @@ export default function CalendarPage() {
       const customer = state.customers.find(item => item.id === rental.customerId)
       const detail = `${vehicleLabel(vehicle)} · ${customer?.name || 'Cliente'}`
       return [
+        ...(missingFinalMileage(rental) ? [{ id: `mileage-${rental.id}`, date: rental.endDate || rental.startDate, title: 'Faltan km finales del alquiler.', detail, type: 'alquiler' as const }] : []),
         { id: `rental-start-${rental.id}`, date: rental.startDate, title: 'Entrega de vehículo', detail, type: 'alquiler' as const },
         ...(rental.endDate ? [{ id: `rental-end-${rental.id}`, date: rental.endDate, title: 'Devolución de vehículo', detail, type: 'alquiler' as const }] : []),
       ]

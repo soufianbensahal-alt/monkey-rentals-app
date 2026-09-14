@@ -1,6 +1,7 @@
 import { useDeferredValue, useMemo, useState, type FormEvent } from 'react'
 import { Building2, Download, Eye, FileText, Mail, Pencil, Phone, Plus, Search, Upload, User } from 'lucide-react'
 import { Badge, ConfirmButton, EmptyState, Modal, PageHeader } from '../components/ui'
+import { MileageHistory } from '../components/MileageHistory'
 import { useFleet } from '../store/FleetContext'
 import { date, euro, uid } from '../lib/format'
 import { effectivePaymentStatus } from '../lib/payments'
@@ -127,6 +128,7 @@ export default function CustomersPage() {
             {rentals.some(rental => rental.status === 'activo') && <Badge tone="success">Alquiler activo</Badge>}
             {futureReservation && <Badge tone="info">Reserva {date(futureReservation.startDate)}</Badge>}
           </div>}
+          <MileageHistory rentals={rentals} state={state}/>
           <CustomerDocuments documents={documents} onAdd={() => openDocumentModal(customer)} onDelete={id => remove('clientDocuments', id)}/>
         </article>
       })}

@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useReducer,
 import { Monitor, Moon, ShieldCheck, Sun } from 'lucide-react'
 import { emptyState } from '../data/emptyState'
 import { fetchRemoteMeta, fetchRemoteState, getRememberRemoteSession, getRemoteOwnerId, readRemoteSession, refreshRemoteSession, remoteEnabled, saveRemoteSession, saveRemoteState, setRememberRemoteSession, signInRemote, signOutRemote, type RemoteSession, type RemoteStatus } from '../lib/remoteStore'
+import { saveRentalMileage } from '../lib/mileage'
 import { getNextPaymentDate } from '../lib/paymentReminders'
 import { applyLoginTheme, applyTheme, getSavedLoginThemeMode, getSavedTheme, saveLoginThemeMode, type ThemeMode } from '../lib/theme'
 import type { AdminSettings, CalendarEvent, ClientDocument, Customer, Document, Fine, FleetState, MaintenanceRecord, Payment, Rental, Task, Vehicle, VehicleTax } from '../types'
@@ -14,6 +15,7 @@ const REMOTE_REFRESH_MIN_GAP_MS = 10000
 type Entity = Vehicle | Customer | Rental | Payment | ClientDocument | Task | MaintenanceRecord | Document | VehicleTax | Fine | CalendarEvent
 type Collection = 'vehicles' | 'customers' | 'rentals' | 'payments' | 'clientDocuments' | 'tasks' | 'maintenance' | 'documents' | 'taxes' | 'fines' | 'events'
 type Action =
+  | { type:'saveRentalMileage'; rental:Rental; createCharge:boolean; today:string }
   | { type:'hydrate'; state:FleetState }
   | { type:'upsert'; collection:Collection; item:Entity }
   | { type:'remove'; collection:Collection; id:string }
@@ -23,6 +25,7 @@ type Action =
   | { type:'reset' }
 
 function reducer(state: FleetState, action: Action): FleetState {
+  if (action.type === 'saveRentalMileage') return saveRentalMileage(state, action.rental, action.createCharge, action.today)
   if (action.type === 'hydrate') return action.state
   if (action.type === 'reset') return structuredClone(emptyState)
   if (action.type === 'settings') return { ...state, adminSettings: action.settings }
@@ -31,7 +34,7 @@ function reducer(state: FleetState, action: Action): FleetState {
     const payment = state.payments.find(item => item.id === action.id)
     if (!payment) return state
     const rental = state.rentals.find(item => item.id === payment.rentalId)
-    const nextDate = getNextPaymentDate(payment)
+    const nextDate = payment.type === 'km_extra' ? null : getNextPaymentDate(payment)
     const nextPayment: Payment | null = rental?.status === 'activo' && nextDate ? {
       id: `payment-${Date.now()}`,
       rentalId: payment.rentalId,
@@ -172,6 +175,7 @@ interface FleetContextValue {
   remoteEnabled:boolean
   authEmail?:string
   rememberSession:boolean
+  saveRental:(rental:Rental,createCharge:boolean)=>void
   upsert:(collection:Collection,item:Entity)=>void
   remove:(collection:Collection,id:string)=>void
   toggleTask:(id:string)=>void
@@ -408,6 +412,11 @@ export function FleetProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({
     state, syncStatus, syncError, remoteEnabled, authEmail:session?.email, rememberSession,
+    saveRental:(rental:Rental,createCharge:boolean)=>{
+      const today = new Date().toISOString().slice(0,10)
+      saveRentalMileage(state, rental, createCharge, today)
+      dispatch({type:'saveRentalMileage',rental,createCharge,today})
+    },
     upsert:(collection:Collection,item:Entity)=>dispatch({type:'upsert',collection,item}),
     remove:(collection:Collection,id:string)=>dispatch({type:'remove',collection,id}),
     toggleTask:(id:string)=>dispatch({type:'toggleTask',id}),

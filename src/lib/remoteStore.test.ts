@@ -75,6 +75,20 @@ describe('remoteStore', () => {
     expect(fetchMock).toHaveBeenCalledWith('https://supabase.test/rest/v1/fleet_state?user_id=eq.user-a&select=updated_at,user_id&limit=1', expect.any(Object))
   })
 
+  it('sincroniza los campos de kilometraje, devolución y cargo dentro del estado del propietario', async () => {
+    const state = structuredClone(emptyState)
+    state.rentals = [{id:'r1',vehicleId:'v1',customerId:'c1',startDate:'2026-09-01',endDate:'2026-09-05',agreedPrice:120,pricePeriod:'dia',expectedKilometers:0,status:'finalizado',notes:'',kmStart:125400,kmEnd:126050,kmUsed:650,kmIncludedTotal:500,kmExtraEnabled:true,kmExtraPrice:0.15,kmExtraVatRate:21,kmExtraBaseAmount:22.5,kmExtraVatAmount:4.73,kmExtraTotalAmount:27.23,kmExtraPaymentId:'extra-1',returnNotes:'Sin incidencias'}]
+    state.payments = [{id:'extra-1',rentalId:'r1',dueDate:'2026-09-05',amount:27.23,status:'pendiente',type:'km_extra',kmExtraRelated:150,mileageCharge:true,notes:'Cargo revisado'}]
+    const fetchMock = vi.fn().mockResolvedValueOnce({ok:true}).mockResolvedValueOnce({ok:true,json:async () => [{state:JSON.parse(JSON.stringify(state)),updated_at:'2026-09-05T12:00:00Z',user_id:'user-a'}]})
+    vi.stubGlobal('fetch',fetchMock)
+    const {saveRemoteState,fetchRemoteState} = await import('./remoteStore')
+    await saveRemoteState(state,{accessToken:'token-1',userId:'user-a'})
+    const reloaded = await fetchRemoteState({accessToken:'token-2',userId:'user-a'})
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)[0]).toMatchObject({user_id:'user-a',state})
+    expect(reloaded?.state).toEqual(state)
+    expect(fetchMock.mock.calls[1][0]).toContain('user_id=eq.user-a')
+  })
+
   it('rechaza lecturas remotas sin usuario identificable', async () => {
     const { fetchRemoteState } = await import('./remoteStore')
 

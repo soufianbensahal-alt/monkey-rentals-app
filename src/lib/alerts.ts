@@ -1,4 +1,5 @@
 import { daysUntil, effectivePaymentStatus, isPaymentAlert } from './payments'
+import { missingFinalMileage } from './mileage'
 import { vehicleLabel } from './vehicles'
 import type { FleetState } from '../types'
 
@@ -36,5 +37,11 @@ export function getSystemAlerts(state: FleetState): SystemAlert[] {
     const customer = state.customers.find(c => c.id === item.customerId)
     return { id:`fine-${item.id}`, title:item.status === 'reclamada' ? 'Multa reclamada' : 'Multa pendiente', detail:`${vehicleLabel(vehicle)} · ${customer?.name || 'Sin cliente vinculado'}`, date:item.infractionDate, severity:'warning' as const, to:`/app/documentacion?vehicle=${item.vehicleId}` }
   })
-  return [...payments,...documents,...taxes,...maintenance,...fines].sort((a,b)=>a.date.localeCompare(b.date))
+  const mileage = state.rentals.filter(missingFinalMileage).map(rental => ({
+    id:`mileage-${rental.id}`, title:'Faltan km finales del alquiler.',
+    detail:`${vehicleLabel(state.vehicles.find(v => v.id === rental.vehicleId))} · ${state.customers.find(c => c.id === rental.customerId)?.name || 'Cliente'}`,
+    date:rental.endDate || rental.startDate, severity:'warning' as const,
+    to:`/app/alquileres?edit=${encodeURIComponent(rental.id)}`,
+  }))
+  return [...payments,...documents,...taxes,...maintenance,...fines,...mileage].sort((a,b)=>a.date.localeCompare(b.date))
 }

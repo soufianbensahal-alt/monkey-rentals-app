@@ -2,7 +2,7 @@ import { useDeferredValue, useMemo, useState, type FormEvent } from 'react'
 import { Check, CreditCard, Pencil, Plus, Search } from 'lucide-react'
 import { Badge, ConfirmButton, EmptyState, Modal, PageHeader, StatCard } from '../components/ui'
 import { useFleet } from '../store/FleetContext'
-import { date, euro, uid } from '../lib/format'
+import { date, euro, euroWithCents, uid } from '../lib/format'
 import { effectivePaymentStatus } from '../lib/payments'
 import { isFlexiblePayment, paymentKindLabel, paymentReminderLabel, paymentTypeLabels, recurrenceFromFrequency, reminderFrequencyLabels } from '../lib/paymentReminders'
 import { vehicleLabel } from '../lib/vehicles'
@@ -62,14 +62,17 @@ export default function PaymentsPage() {
     const dueDate = String(form.get('dueDate'))
     const rentalId = String(form.get('rentalId'))
     const type = String(form.get('type')) as PaymentType
-    const reminderFrequency = String(form.get('reminderFrequency')) as ReminderFrequency
+    const requestedFrequency = String(form.get('reminderFrequency')) as ReminderFrequency
+    const reminderFrequency = type === 'km_extra' && requestedFrequency !== 'none' ? 'once' : requestedFrequency
     const recurrenceInterval = Math.max(1, Number(form.get('recurrenceInterval')) || 1)
     const status = String(form.get('status')) as PaymentStatus
     if (!rentalId || !dueDate || amount <= 0) {
       setError('Completa el alquiler, la fecha y un importe válido.')
       return
     }
+    if (editing?.mileageCharge && (amount !== editing.amount || rentalId !== editing.rentalId || type !== 'km_extra')) { setError('El importe y la asociación de este cargo proceden del kilometraje. Cancela el cargo y revisa el alquiler para recalcularlo.'); return }
     upsert('payments', {
+      ...editing,
       id:editing?.id || uid('p'),
       rentalId,
       dueDate,
@@ -80,7 +83,7 @@ export default function PaymentsPage() {
       reminderEnabled:reminderFrequency !== 'none',
       reminderDate:reminderFrequency !== 'none' ? dueDate : undefined,
       reminderFrequency,
-      recurrenceType:recurrenceFromFrequency(reminderFrequency),
+      recurrenceType:type === 'km_extra' ? 'unico' : recurrenceFromFrequency(reminderFrequency),
       recurrenceInterval,
       isFlexible:type === 'flexible',
       flexibleNotes:String(form.get('flexibleNotes')).trim(),
@@ -113,10 +116,10 @@ export default function PaymentsPage() {
         <tbody>{rows.map(({ payment, customer, vehicle, status, flexible }) => <tr key={payment.id}>
           <td><p className="font-bold">{customer?.name || 'Cliente no disponible'}</p><p className="text-xs text-stone-500">{vehicleLabel(vehicle)} · {vehicle?.plate}</p></td>
           <td>{date(payment.dueDate)}{payment.paidDate && <span className="block text-xs text-stone-500">Pagado: {date(payment.paidDate)}</span>}</td>
-          <td>{paymentKindLabel(payment)}{flexible && payment.flexibleNotes && <span className="block text-xs text-stone-500">{payment.flexibleNotes}</span>}</td>
+          <td>{paymentKindLabel(payment)}{payment.mileageCharge && <span className="mt-1 block max-w-xs text-xs text-stone-500">{payment.kmExtraRelated} km × {euroWithCents.format(payment.kmExtraPrice || 0)} · Base {euroWithCents.format(payment.kmExtraBaseAmount || 0)} + IVA {payment.kmExtraVatRate}% ({euroWithCents.format(payment.kmExtraVatAmount || 0)})</span>}{flexible && payment.flexibleNotes && <span className="block text-xs text-stone-500">{payment.flexibleNotes}</span>}</td>
           <td><Badge tone={flexible && status !== 'pagado' ? 'info' : tones[status]}>{flexible && status !== 'pagado' ? 'flexible' : status}</Badge></td>
           <td>{paymentReminderLabel(payment)}</td>
-          <td className="font-bold">{euro.format(payment.amount)}</td>
+          <td className="font-bold">{payment.type === 'km_extra' ? euroWithCents.format(payment.amount) : euro.format(payment.amount)}</td>
           <td><div className="flex items-center gap-3">{status !== 'pagado' && status !== 'cancelado' && <button className="btn-primary min-h-9 px-3 py-1 text-xs" onClick={() => markPaymentPaid(payment.id)}><Check size={15}/> Pagado</button>}<button onClick={() => open(payment)} aria-label="Editar pago" className="text-stone-500 hover:text-brand-600"><Pencil size={18}/></button><ConfirmButton title="Eliminar pago" message="¿Seguro que quieres eliminar este pago? Esta acción no se puede deshacer." onConfirm={() => remove('payments', payment.id)}/></div></td>
         </tr>)}</tbody>
       </table> : <EmptyState title="No hay pagos que coincidan." description="Ajusta la búsqueda o cambia el filtro para ver más resultados."/> : <EmptyState title="No hay pagos registrados." description="Los pagos creados desde alquileres aparecerán aquí." action={state.rentals.length ? <button className="btn-primary" onClick={() => open(blank())}><Plus size={18}/> Registrar pago</button> : undefined}/>}

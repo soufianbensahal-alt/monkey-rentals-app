@@ -107,7 +107,7 @@ describe('Excel completo de Informes', () => {
     const transform = reportFilters(sheets).files!.transform!['xl/worksheets/sheet{id}.xml']!.transform!
     const xml = '<worksheet><sheetData/><mergeCells/><pageMargins/></worksheet>'
     const result = transform(xml, sheets[index], {sheetIndex:index, sheetId:String(index + 1)})
-    expect(result).toContain('<autoFilter ref="A1:K5"/>')
+    expect(result).toContain('<autoFilter ref="A1:N5"/>')
     expect(result.indexOf('autoFilter')).toBeLessThan(result.indexOf('mergeCells'))
     expect(transform(result, sheets[index], {sheetIndex:index, sheetId:String(index + 1)})).toBe(result)
   })
