@@ -11,6 +11,7 @@ import {
   CircleAlert,
   CreditCard,
   FileCheck2,
+  KeyRound,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -39,7 +40,7 @@ interface NavItem {
 const primaryNav: NavItem[] = [
   { to: '/app', label: 'Inicio', desktopLabel: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/app/flota', label: 'Flota', icon: Car },
-  { to: '/app/alquileres', label: 'Alquileres', icon: CalendarDays },
+  { to: '/app/alquileres', label: 'Alquileres', icon: KeyRound },
   { to: '/app/pagos', label: 'Pagos', icon: CreditCard },
   { to: '/app/clientes', label: 'Clientes', icon: Users },
 ]
@@ -56,7 +57,7 @@ const secondaryNav: NavItem[] = [
 const desktopNav: NavItem[] = [
   { to: '/app', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/app/flota', label: 'Flota', icon: Car },
-  { to: '/app/alquileres', label: 'Alquileres', icon: CalendarDays },
+  { to: '/app/alquileres', label: 'Alquileres', icon: KeyRound },
   { to: '/app/calendario', label: 'Calendario', icon: CalendarDays },
   { to: '/app/mantenimiento', label: 'Mantenimiento', icon: Wrench },
   { to: '/app/documentacion', label: 'ITV / Documentación', icon: FileCheck2 },
