@@ -11,7 +11,7 @@ import { calculateMileage, getVehicleMileage, mileagePayment } from '../lib/mile
 import { vehicleLabel } from '../lib/vehicles'
 import type { FleetState, PricePeriod, ReminderFrequency, Rental, RentalMileage, RentalStatus } from '../types'
 
-const tones = { activo:'success', pendiente:'warning', cancelado:'danger', finalizado:'neutral' } as const
+const tones = { activo:'success', pendiente:'warning', cancelado:'danger', finalizado:'info' } as const
 const periods: Record<PricePeriod, string> = { dia:'día', semana:'semana', mes:'mes', otro:'otro periodo' }
 const billingOptions: Array<{ value: RentalBillingPeriod; label: string }> = [
   { value:'dia', label:'Por días' },
