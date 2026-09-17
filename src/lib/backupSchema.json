@@ -1,0 +1,1060 @@
+{
+  "type": "object",
+  "properties": {
+    "version": {
+      "const": 4
+    },
+    "vehicles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "plate": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "brand": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "year": {
+            "type": "number"
+          },
+          "dailyRate": {
+            "type": "number"
+          },
+          "weeklyRate": {
+            "type": "number"
+          },
+          "monthlyRate": {
+            "type": "number"
+          },
+          "includedKmPerDay": {
+            "type": "number"
+          },
+          "extraKmRate": {
+            "type": "number"
+          },
+          "currentKm": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "lastKmUpdate": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "status": {
+            "anyOf": [
+              {
+                "const": "disponible"
+              },
+              {
+                "const": "alquilado"
+              },
+              {
+                "const": "mantenimiento"
+              },
+              {
+                "const": "reservado"
+              }
+            ]
+          },
+          "image": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "plate",
+          "category",
+          "brand",
+          "model",
+          "year",
+          "dailyRate",
+          "weeklyRate",
+          "monthlyRate",
+          "includedKmPerDay",
+          "extraKmRate",
+          "status",
+          "notes"
+        ]
+      }
+    },
+    "customers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "dni": {
+            "type": "string"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "rentals": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "phone",
+          "dni",
+          "rentals"
+        ]
+      }
+    },
+    "rentals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "vehicleId": {
+            "type": "string"
+          },
+          "customerId": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string"
+          },
+          "endDate": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "agreedPrice": {
+            "type": "number"
+          },
+          "pricePeriod": {
+            "anyOf": [
+              {
+                "const": "dia"
+              },
+              {
+                "const": "semana"
+              },
+              {
+                "const": "mes"
+              },
+              {
+                "const": "otro"
+              }
+            ]
+          },
+          "durationDays": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "expectedKilometers": {
+            "type": "number"
+          },
+          "nextPaymentDate": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "nextPaymentAmount": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "paymentReminderFrequency": {
+            "anyOf": [
+              {
+                "const": "none"
+              },
+              {
+                "const": "once"
+              },
+              {
+                "const": "daily"
+              },
+              {
+                "const": "weekly"
+              },
+              {
+                "const": "biweekly"
+              },
+              {
+                "const": "monthly"
+              },
+              {
+                "const": "custom"
+              }
+            ]
+          },
+          "paymentRecurrenceType": {
+            "anyOf": [
+              {
+                "const": "unico"
+              },
+              {
+                "const": "recurrente"
+              }
+            ]
+          },
+          "status": {
+            "anyOf": [
+              {
+                "const": "activo"
+              },
+              {
+                "const": "finalizado"
+              },
+              {
+                "const": "pendiente"
+              },
+              {
+                "const": "cancelado"
+              }
+            ]
+          },
+          "notes": {
+            "type": "string"
+          },
+          "kmStart": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "kmEnd": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "kmUsed": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "kmIncludedTotal": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "kmIncludedUnit": {
+            "anyOf": [
+              {
+                "const": "dia"
+              },
+              {
+                "const": "semana"
+              },
+              {
+                "const": "mes"
+              },
+              {
+                "const": "total"
+              }
+            ]
+          },
+          "kmIncludedPerUnit": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "kmIncludedPeriods": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "kmExtraEnabled": {
+            "anyOf": [
+              {
+                "const": false
+              },
+              {
+                "const": true
+              }
+            ]
+          },
+          "kmExtraPrice": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "kmExtraDefaultPrice": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "kmExtraVatRate": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "kmExtraUsed": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "kmExtraBaseAmount": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "kmExtraVatAmount": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "kmExtraTotalAmount": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "kmExtraPaymentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "returnCondition": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "returnNotes": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "vehicleId",
+          "customerId",
+          "startDate",
+          "agreedPrice",
+          "pricePeriod",
+          "expectedKilometers",
+          "status",
+          "notes"
+        ]
+      }
+    },
+    "payments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "rentalId": {
+            "type": "string"
+          },
+          "dueDate": {
+            "type": "string"
+          },
+          "paidDate": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "amount": {
+            "type": "number"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "const": "pendiente"
+              },
+              {
+                "const": "cancelado"
+              },
+              {
+                "const": "pagado"
+              },
+              {
+                "const": "atrasado"
+              },
+              {
+                "const": "flexible"
+              }
+            ]
+          },
+          "type": {
+            "anyOf": [
+              {
+                "const": "otro"
+              },
+              {
+                "const": "flexible"
+              },
+              {
+                "const": "normal"
+              },
+              {
+                "const": "fianza"
+              },
+              {
+                "const": "penalizacion"
+              },
+              {
+                "const": "km_extra"
+              },
+              {
+                "const": "multa"
+              }
+            ]
+          },
+          "kmExtraRelated": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "kmExtraPrice": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "kmExtraVatRate": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "kmExtraBaseAmount": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "kmExtraVatAmount": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "mileageCharge": {
+            "anyOf": [
+              {
+                "const": false
+              },
+              {
+                "const": true
+              }
+            ]
+          },
+          "reminderEnabled": {
+            "anyOf": [
+              {
+                "const": false
+              },
+              {
+                "const": true
+              }
+            ]
+          },
+          "reminderDate": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "reminderFrequency": {
+            "anyOf": [
+              {
+                "const": "none"
+              },
+              {
+                "const": "once"
+              },
+              {
+                "const": "daily"
+              },
+              {
+                "const": "weekly"
+              },
+              {
+                "const": "biweekly"
+              },
+              {
+                "const": "monthly"
+              },
+              {
+                "const": "custom"
+              }
+            ]
+          },
+          "recurrenceType": {
+            "anyOf": [
+              {
+                "const": "unico"
+              },
+              {
+                "const": "recurrente"
+              }
+            ]
+          },
+          "recurrenceInterval": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "isFlexible": {
+            "anyOf": [
+              {
+                "const": false
+              },
+              {
+                "const": true
+              }
+            ]
+          },
+          "flexibleNotes": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "rentalId",
+          "dueDate",
+          "amount",
+          "status",
+          "notes"
+        ]
+      }
+    },
+    "clientDocuments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "customerId": {
+            "type": "string"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "const": "DNI / NIE"
+              },
+              {
+                "const": "Pasaporte"
+              },
+              {
+                "const": "Carnet de conducir"
+              },
+              {
+                "const": "Contrato firmado"
+              },
+              {
+                "const": "Justificante"
+              },
+              {
+                "const": "Otro"
+              }
+            ]
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "size": {
+            "type": "number"
+          },
+          "uploadedAt": {
+            "type": "string"
+          },
+          "dataUrl": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "customerId",
+          "type",
+          "fileName",
+          "mimeType",
+          "size",
+          "uploadedAt",
+          "dataUrl",
+          "notes"
+        ]
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "dueDate": {
+            "type": "string"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "const": "alta"
+              },
+              {
+                "const": "media"
+              },
+              {
+                "const": "baja"
+              }
+            ]
+          },
+          "completed": {
+            "anyOf": [
+              {
+                "const": false
+              },
+              {
+                "const": true
+              }
+            ]
+          },
+          "category": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "dueDate",
+          "priority",
+          "completed",
+          "category"
+        ]
+      }
+    },
+    "maintenance": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "vehicleId": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "cost": {
+            "type": "number"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "const": "programado"
+              },
+              {
+                "const": "en curso"
+              },
+              {
+                "const": "completado"
+              }
+            ]
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "vehicleId",
+          "type",
+          "date",
+          "cost",
+          "status",
+          "notes"
+        ]
+      }
+    },
+    "documents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "vehicleId": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "expiryDate": {
+            "type": "string"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "paymentStatus": {
+            "anyOf": [
+              {
+                "const": "pendiente"
+              },
+              {
+                "const": "pagado"
+              }
+            ]
+          },
+          "paidDate": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "vehicleId",
+          "type",
+          "expiryDate",
+          "notes"
+        ]
+      }
+    },
+    "taxes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "vehicleId": {
+            "type": "string"
+          },
+          "concept": {
+            "type": "string"
+          },
+          "dueDate": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "const": "pendiente"
+              },
+              {
+                "const": "pagado"
+              }
+            ]
+          },
+          "paidDate": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "vehicleId",
+          "concept",
+          "dueDate",
+          "amount",
+          "status",
+          "notes"
+        ]
+      }
+    },
+    "fines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "vehicleId": {
+            "type": "string"
+          },
+          "customerId": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "rentalId": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "infractionDate": {
+            "type": "string"
+          },
+          "dueDate": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "amount": {
+            "type": "number"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "const": "pendiente"
+              },
+              {
+                "const": "pagada"
+              },
+              {
+                "const": "reclamada"
+              },
+              {
+                "const": "cargada al cliente"
+              },
+              {
+                "const": "archivada"
+              }
+            ]
+          },
+          "concept": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "vehicleId",
+          "infractionDate",
+          "amount",
+          "status",
+          "concept",
+          "notes"
+        ]
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "const": "mantenimiento"
+              },
+              {
+                "const": "entrega"
+              },
+              {
+                "const": "devolución"
+              },
+              {
+                "const": "itv"
+              },
+              {
+                "const": "reserva"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "date",
+          "type"
+        ]
+      }
+    },
+    "adminSettings": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "company": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "company",
+        "email",
+        "phone"
+      ]
+    }
+  },
+  "required": [
+    "version",
+    "vehicles",
+    "customers",
+    "rentals",
+    "payments",
+    "clientDocuments",
+    "tasks",
+    "maintenance",
+    "documents",
+    "taxes",
+    "fines",
+    "events",
+    "adminSettings"
+  ]
+}

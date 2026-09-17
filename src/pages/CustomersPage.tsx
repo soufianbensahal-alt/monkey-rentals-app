@@ -192,8 +192,8 @@ function CustomerDocuments({ documents, onAdd, onDelete }: { documents: ClientDo
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
-          <a className="btn-secondary min-h-9 px-3 py-1.5 text-xs" href={document.dataUrl} target="_blank" rel="noreferrer"><Eye size={15}/> Ver</a>
-          <a className="btn-secondary min-h-9 px-3 py-1.5 text-xs" href={document.dataUrl} download={document.fileName}><Download size={15}/> Descargar</a>
+          {document.dataUrl ? <><a className="btn-secondary min-h-9 px-3 py-1.5 text-xs" href={document.dataUrl} target="_blank" rel="noreferrer"><Eye size={15}/> Ver</a>
+          <a className="btn-secondary min-h-9 px-3 py-1.5 text-xs" href={document.dataUrl} download={document.fileName}><Download size={15}/> Descargar</a></> : <span className="text-xs text-stone-500">Archivo no incluido en la copia. Vuelve a adjuntarlo.</span>}
           <ConfirmButton
             className="btn-secondary min-h-9 px-3 py-1.5 text-xs text-red-700"
             title="Eliminar documento"

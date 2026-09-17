@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Monitor, Moon, ShieldCheck, Sun } from 'lucide-react'
+import { parseBackup, restoreBackup, type RestoreMode } from '../lib/backups'
 import { emptyState } from '../data/emptyState'
 import { fetchRemoteMeta, fetchRemoteState, getRememberRemoteSession, getRemoteOwnerId, readRemoteSession, refreshRemoteSession, remoteEnabled, saveRemoteSession, saveRemoteState, setRememberRemoteSession, signInRemote, signOutRemote, type RemoteSession, type RemoteStatus } from '../lib/remoteStore'
 import { saveRentalMileage } from '../lib/mileage'
@@ -174,6 +175,8 @@ interface FleetContextValue {
   syncError:string
   remoteEnabled:boolean
   authEmail?:string
+  ownerId:string|null
+  restoreFromBackup:(text:string,mode:RestoreMode)=>void
   rememberSession:boolean
   saveRental:(rental:Rental,createCharge:boolean)=>void
   upsert:(collection:Collection,item:Entity)=>void
@@ -281,8 +284,9 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     const timeout = window.setTimeout(async () => {
       setSyncStatus('saving')
       try {
-        remoteUpdatedAt.current = await saveRemoteState(stateRef.current, session)
-        lastSyncedState.current = JSON.stringify(stateRef.current)
+        const savingState=stateRef.current
+        remoteUpdatedAt.current = await saveRemoteState(savingState, session)
+        lastSyncedState.current = JSON.stringify(savingState)
         setSyncStatus('online')
         setSyncError('')
       } catch (error) {
@@ -296,14 +300,23 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!remoteEnabled || !session) return
     const refresh = async () => {
+      const snapshot=stateRef.current
       const now = Date.now()
       if (now - lastRefreshAt.current < REMOTE_REFRESH_MIN_GAP_MS) return
       lastRefreshAt.current = now
       try {
+        if (JSON.stringify(snapshot)!==lastSyncedState.current) {
+          const updatedAt=await saveRemoteState(snapshot,session)
+          remoteUpdatedAt.current=updatedAt
+          lastSyncedState.current=JSON.stringify(snapshot)
+          setSyncStatus('online')
+          setSyncError('')
+          return
+        }
         const meta = await fetchRemoteMeta(session)
         if (meta?.updated_at && meta.updated_at !== remoteUpdatedAt.current) {
           const remote = await fetchRemoteState(session)
-          if (!remote) return
+          if (!remote || stateRef.current!==snapshot) return
           const remoteState = normalizeState(remote.state)
           remoteUpdatedAt.current = remote.updated_at
           lastSyncedState.current = JSON.stringify(remoteState)
@@ -408,10 +421,32 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     } else if (session) saveRemoteSession(session, true)
   }, [clearRemoteLogin, session])
 
-  const retrySync = useCallback(async () => { await hydrateFromRemote(session) }, [hydrateFromRemote, session])
+  const retrySync = useCallback(async () => {
+    if (session && hydrated.current && JSON.stringify(stateRef.current)!==lastSyncedState.current) {
+      const pending=stateRef.current
+      setSyncStatus('saving')
+      try {
+        remoteUpdatedAt.current=await saveRemoteState(pending,session)
+        lastSyncedState.current=JSON.stringify(pending)
+        setSyncStatus('online');setSyncError('')
+      } catch(error) {
+        setSyncStatus('offline');setSyncError(error instanceof Error?error.message:'No se han podido sincronizar los cambios.')
+      }
+    } else await hydrateFromRemote(session)
+  }, [hydrateFromRemote, session])
 
   const value = useMemo(() => ({
     state, syncStatus, syncError, remoteEnabled, authEmail:session?.email, rememberSession,
+    ownerId:getRemoteOwnerId(session),
+    restoreFromBackup:(text:string,mode:RestoreMode)=>{
+      const owner=getRemoteOwnerId(session)
+      if (!owner || getRemoteOwnerId(readRemoteSession())!==owner || syncStatus==='loading' || syncStatus==='saving') throw new Error('Espera a que termine la sincronización e inicia sesión antes de restaurar.')
+      const backup=parseBackup(text,owner)
+      const restored=restoreBackup(stateRef.current,backup,mode)
+      persistCachedState(storageKeyForSession(session),restored)
+      stateRef.current=restored
+      dispatch({type:'hydrate',state:restored})
+    },
     saveRental:(rental:Rental,createCharge:boolean)=>{
       const today = new Date().toISOString().slice(0,10)
       saveRentalMileage(state, rental, createCharge, today)
@@ -424,7 +459,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     updateSettings:(settings:AdminSettings)=>dispatch({type:'settings',settings}),
     reset:()=>dispatch({type:'reset'}),
     signIn, signOut, signOutEverywhere, setRememberSession, retrySync,
-  }), [state, syncStatus, syncError, session?.email, rememberSession, signIn, signOut, signOutEverywhere, setRememberSession, retrySync])
+  }), [state, syncStatus, syncError, session, rememberSession, signIn, signOut, signOutEverywhere, setRememberSession, retrySync])
   return <FleetContext.Provider value={value}>{remoteEnabled && !session ? <LoginScreen error={syncError} onSubmit={signIn}/> : children}</FleetContext.Provider>
 }
 
