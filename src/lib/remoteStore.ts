@@ -196,3 +196,11 @@ export async function saveRemoteState(state: FleetState, session: RemoteSession)
   if (!response.ok) throw new Error('No se han podido guardar los datos remotos.')
   return updatedAt
 }
+
+export async function callNotificationService(body:Record<string,unknown>) {
+  const session=readRemoteSession()
+  if(!session || !remoteEnabled)throw new Error('Inicia sesión para configurar las notificaciones.')
+  const response=await authedFetch(`${config.url}/functions/v1/notification-device`,session,{method:'POST',body:JSON.stringify(body)})
+  if(!response.ok)throw new Error('El servicio de notificaciones no está disponible. Revisa su configuración o inténtalo de nuevo.')
+  return response.json() as Promise<{publicKey?:string;active?:boolean}>
+}

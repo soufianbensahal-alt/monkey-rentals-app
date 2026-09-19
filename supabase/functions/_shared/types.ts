@@ -1,3 +1,4 @@
+// Generated from src/types.ts. Run npm run notifications:prepare.
 export type Priority = 'alta' | 'media' | 'baja'
 export type VehicleStatus = 'disponible' | 'alquilado' | 'mantenimiento' | 'reservado'
 export type RentalStatus = 'activo' | 'finalizado' | 'pendiente' | 'cancelado'

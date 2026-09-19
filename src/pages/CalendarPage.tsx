@@ -1,5 +1,8 @@
-import { useMemo, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { ReminderEditor } from '../components/ReminderEditor'
+import { UpcomingReminders } from '../components/UpcomingReminders'
+import { occurrences, offsetLabel, reminderDetails, reminderCategories } from '../lib/reminders'
+import { useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
   CalendarCheck,
@@ -16,16 +19,15 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useFleet } from '../store/FleetContext'
-import { Modal, PageHeader } from '../components/ui'
-import { date, euro, uid } from '../lib/format'
+import { PageHeader } from '../components/ui'
+import { date, euro } from '../lib/format'
 import { effectivePaymentStatus } from '../lib/payments'
 import { isFlexiblePayment, paymentReminderLabel } from '../lib/paymentReminders'
-import { missingFinalMileage } from '../lib/mileage'
+import { hasMileageAlert } from '../lib/mileage'
 import { vehicleLabel } from '../lib/vehicles'
-import type { CalendarEvent } from '../types'
 
 type View = 'month' | 'week' | 'day'
-type EventType = 'pago' | 'pago_unico' | 'pago_recurrente' | 'pago_flexible' | 'atrasado' | 'alquiler' | 'itv' | 'mantenimiento' | 'documento' | 'impuesto' | 'multa' | 'reserva'
+type EventType = 'pago' | 'pago_unico' | 'pago_recurrente' | 'pago_flexible' | 'atrasado' | 'alquiler' | 'itv' | 'mantenimiento' | 'documento' | 'impuesto' | 'multa' | 'reserva' | 'otro'
 
 interface AgendaEvent {
   id: string
@@ -33,6 +35,10 @@ interface AgendaEvent {
   title: string
   detail: string
   type: EventType
+  time?:string
+  reminderId?:string
+  status?:string
+  priority?:string
 }
 
 const eventStyle: Record<EventType, { label: string; icon: LucideIcon; dot: string; badge: string; card: string }> = {
@@ -47,7 +53,8 @@ const eventStyle: Record<EventType, { label: string; icon: LucideIcon; dot: stri
   documento: { label: 'Documentación', icon: FileCheck2, dot: 'bg-blue-600', badge: 'bg-blue-100 text-blue-800', card: 'border-blue-200 bg-blue-50/70' },
   impuesto: { label: 'Impuesto', icon: ReceiptText, dot: 'bg-amber-500', badge: 'bg-amber-100 text-amber-900', card: 'border-amber-200 bg-amber-50/70' },
   multa: { label: 'Multa', icon: AlertTriangle, dot: 'bg-rose-600', badge: 'bg-rose-100 text-rose-800', card: 'border-rose-200 bg-rose-50/70' },
-  reserva: { label: 'Recordatorio', icon: CalendarCheck, dot: 'bg-teal-700', badge: 'bg-teal-100 text-teal-900', card: 'border-teal-200 bg-teal-50/70' },
+  otro: { label:'Otro', icon:CalendarCheck, dot:'bg-stone-500', badge:'bg-stone-100 text-stone-800', card:'border-stone-200 bg-stone-50/70' },
+  reserva: { label: 'Reserva', icon: CalendarCheck, dot: 'bg-teal-700', badge: 'bg-teal-100 text-teal-900', card: 'border-teal-200 bg-teal-50/70' },
 }
 
 const iso = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
@@ -56,20 +63,23 @@ const monthName = (month: number) => new Intl.DateTimeFormat('es-ES', { month: '
 const longDate = (value: string) => new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(fromIso(value))
 
 export default function CalendarPage() {
-  const { state, upsert } = useFleet()
-  const [cursor, setCursor] = useState(() => new Date())
+  const { state } = useFleet()
+  const [params,setParams]=useSearchParams()
+  const editing=state.events.find(e=>e.id===params.get('reminder'))
+  const [cursor, setCursor] = useState(() => params.get('date') || editing?.date ? fromIso(params.get('date') || editing!.date) : new Date())
   const [view, setView] = useState<View>('month')
-  const [selected, setSelected] = useState(() => iso(new Date()))
+  const [selected, setSelected] = useState(() => params.get('date') || editing?.date || iso(new Date()))
   const [adding, setAdding] = useState(false)
 
   const events = useMemo<AgendaEvent[]>(() => [
-    ...state.events.map(event => ({
-      id: `event-${event.id}`,
-      date: event.date,
-      title: event.title,
-      detail: event.type === 'reserva' ? 'Recordatorio manual' : event.type,
-      type: event.type === 'itv' ? 'itv' as const : event.type === 'mantenimiento' ? 'mantenimiento' as const : event.type === 'reserva' ? 'reserva' as const : 'alquiler' as const,
-    })),
+    ...state.events.flatMap(event => {
+      const type:EventType=event.type==='entrega'||event.type==='devolución'?'alquiler':event.type
+      const common={title:event.title,type,reminderId:event.id,status:event.status==='completed'?'Completada':event.status==='cancelled'?'Cancelada':'Activa',priority:event.priority}
+      if(!event.reminders?.length || !event.time || event.status==='completed' || event.status==='cancelled') return [{...common,id:`event-${event.id}`,date:event.date,time:event.time,detail:event.description||reminderCategories[event.type]}]
+      const rangeStart=new Date(cursor.getFullYear(),cursor.getMonth(),-6)
+      const rangeEnd=new Date(cursor.getFullYear(),cursor.getMonth()+1,15)
+      return occurrences(event,iso(rangeStart),iso(rangeEnd)).map(o=>({...common,id:o.key,date:o.date,time:o.time,detail:[reminderDetails(event,state),event.reminders!.map(offsetLabel).join(' / '),event.timezone].filter(Boolean).join(' · ')}))
+    }),
     ...state.payments.map(payment => {
       const rental = state.rentals.find(item => item.id === payment.rentalId)
       const customer = state.customers.find(item => item.id === rental?.customerId)
@@ -95,7 +105,7 @@ export default function CalendarPage() {
       const customer = state.customers.find(item => item.id === rental.customerId)
       const detail = `${vehicleLabel(vehicle)} · ${customer?.name || 'Cliente'}`
       return [
-        ...(missingFinalMileage(rental) ? [{ id: `mileage-${rental.id}`, date: rental.endDate || rental.startDate, title: 'Faltan km finales del alquiler.', detail, type: 'alquiler' as const }] : []),
+        ...(hasMileageAlert(rental) ? [{ id: `mileage-${rental.id}`, date: rental.endDate || rental.startDate, title: 'Faltan km finales del alquiler.', detail, type: 'alquiler' as const }] : []),
         { id: `rental-start-${rental.id}`, date: rental.startDate, title: 'Entrega de vehículo', detail, type: 'alquiler' as const },
         ...(rental.endDate ? [{ id: `rental-end-${rental.id}`, date: rental.endDate, title: 'Devolución de vehículo', detail, type: 'alquiler' as const }] : []),
       ]
@@ -104,11 +114,11 @@ export default function CalendarPage() {
     ...state.documents.map(item => ({ id: `document-${item.id}`, date: item.expiryDate, title: `Vence ${item.type}`, detail: vehicleLabel(state.vehicles.find(vehicle => vehicle.id === item.vehicleId)), type: item.type.toLowerCase().includes('itv') ? 'itv' as const : 'documento' as const })),
     ...state.taxes.map(item => ({ id: `tax-${item.id}`, date: item.dueDate, title: item.concept, detail: `${vehicleLabel(state.vehicles.find(vehicle => vehicle.id === item.vehicleId))} · ${euro.format(item.amount)}`, type: 'impuesto' as const })),
     ...state.fines.map(item => ({ id: `fine-${item.id}`, date: item.dueDate || item.infractionDate, title: item.concept, detail: `${vehicleLabel(state.vehicles.find(vehicle => vehicle.id === item.vehicleId))} · ${euro.format(item.amount)}`, type: 'multa' as const })),
-  ], [state])
+  ], [state,cursor])
 
   const year = cursor.getFullYear()
   const month = cursor.getMonth()
-  const selectedEvents = events.filter(event => event.date === selected)
+  const selectedEvents = events.filter(event => event.date === selected).sort((a,b)=>(a.time||'').localeCompare(b.time||''))
   const monthEvents = events.filter(event => event.date.startsWith(`${year}-${String(month + 1).padStart(2, '0')}`))
   const pendingCount = monthEvents.filter(event => ['pago', 'pago_unico', 'pago_recurrente', 'pago_flexible', 'atrasado', 'impuesto', 'multa'].includes(event.type)).length
 
@@ -129,24 +139,13 @@ export default function CalendarPage() {
     setCursor(now)
     setSelected(iso(now))
   }
-  const save = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const form = new FormData(event.currentTarget)
-    upsert('events', {
-      id: uid('event'),
-      title: String(form.get('title')).trim(),
-      date: String(form.get('date')),
-      type: String(form.get('type')) as CalendarEvent['type'],
-    })
-    setAdding(false)
-  }
 
   return <div className="fade-up">
     <PageHeader
       eyebrow="Planificación central"
       title="Calendario de avisos"
       description="Controla pagos, alquileres, ITV, mantenimiento, impuestos y multas desde un solo lugar."
-      action={events.length > 0 ? <button className="btn-primary" onClick={() => setAdding(true)}><Plus size={18}/> Añadir recordatorio</button> : undefined}
+      action={<button className="btn-primary" onClick={() => setAdding(true)}><Plus size={18}/> Añadir alerta</button>}
     />
 
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -195,20 +194,15 @@ export default function CalendarPage() {
       <div>
         <p className="font-display font-bold text-ink">Código de categorías</p>
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
-          {(['pago_unico', 'pago_recurrente', 'pago_flexible', 'atrasado', 'itv', 'mantenimiento', 'impuesto', 'multa', 'alquiler'] as EventType[]).map(type => <span key={type} className="inline-flex items-center gap-2 text-xs font-semibold text-stone-600"><span className={`size-2.5 rounded-full ${eventStyle[type].dot}`}/>{eventStyle[type].label}</span>)}
+          {(['pago_unico', 'pago_recurrente', 'pago_flexible', 'atrasado', 'itv', 'mantenimiento', 'impuesto', 'multa', 'alquiler', 'reserva', 'otro'] as EventType[]).map(type => <span key={type} className="inline-flex items-center gap-2 text-xs font-semibold text-stone-600"><span className={`size-2.5 rounded-full ${eventStyle[type].dot}`}/>{eventStyle[type].label}</span>)}
         </div>
       </div>
       <Link to="/app/alertas" className="btn-secondary shrink-0">Ver todos los avisos</Link>
     </section>
 
-    {adding && <Modal title="Añadir recordatorio" onClose={() => setAdding(false)}>
-      <form className="grid gap-4" onSubmit={save}>
-        <label><span className="label">Título</span><input className="field" name="title" required placeholder="Ej. Entrega de furgoneta · 10:30"/></label>
-        <label><span className="label">Fecha</span><input className="field" name="date" type="date" defaultValue={selected} required/></label>
-        <label><span className="label">Tipo de recordatorio</span><select className="field" name="type"><option value="reserva">Reserva</option><option value="entrega">Entrega</option><option value="devolución">Devolución</option><option value="itv">ITV</option><option value="mantenimiento">Mantenimiento</option></select></label>
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><button type="button" className="btn-secondary" onClick={() => setAdding(false)}>Cancelar</button><button className="btn-primary">Guardar recordatorio</button></div>
-      </form>
-    </Modal>}
+    <UpcomingReminders/>
+    {(adding || editing) && <ReminderEditor key={editing?.id || 'new'} event={editing} date={selected} onClose={()=>{setAdding(false);setParams({})}}/>}
+
   </div>
 }
 
@@ -282,10 +276,11 @@ function AgendaCard({ event }: { event: AgendaEvent }) {
     <div className="min-w-0 flex-1">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className={`rounded-full px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide ${style.badge}`}>{style.label}</span>
-        <span className="inline-flex items-center gap-1 text-xs font-medium text-stone-500"><Clock3 size={13}/> Todo el día</span>
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-stone-500"><Clock3 size={13}/> {event.time||'Todo el día'}</span>
       </div>
       <h3 className="mt-2 font-bold leading-snug text-ink">{event.title}</h3>
       <p className="mt-1 text-sm leading-5 text-stone-600">{event.detail}</p>
+      {event.reminderId&&<div className="mt-2 flex flex-wrap items-center gap-2 text-xs"><span>{event.status}{event.priority==='alta'?' · Prioridad alta':''}</span><Link className="btn-secondary min-h-10" to={`/app/calendario?reminder=${encodeURIComponent(event.reminderId)}&date=${event.date}`}>Editar alerta</Link></div>}
     </div>
   </article>
 }

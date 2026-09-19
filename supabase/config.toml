@@ -1,0 +1,12 @@
+project_id = "monkey-rentals"
+
+[functions.notification-device]
+verify_jwt = true
+entrypoint = "./functions/notification-device/index.ts"
+import_map = "./functions/deno.json"
+
+[functions.notification-dispatch]
+# This endpoint authenticates the private x-cron-secret in its handler.
+verify_jwt = false
+entrypoint = "./functions/notification-dispatch/index.ts"
+import_map = "./functions/deno.json"

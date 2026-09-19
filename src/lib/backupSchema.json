@@ -1006,16 +1006,218 @@
                 "const": "mantenimiento"
               },
               {
-                "const": "entrega"
+                "const": "otro"
               },
               {
-                "const": "devolución"
+                "const": "multa"
+              },
+              {
+                "const": "pago"
+              },
+              {
+                "const": "alquiler"
+              },
+              {
+                "const": "reserva"
               },
               {
                 "const": "itv"
               },
               {
-                "const": "reserva"
+                "const": "impuesto"
+              },
+              {
+                "const": "documento"
+              },
+              {
+                "const": "entrega"
+              },
+              {
+                "const": "devolución"
+              }
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "time": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "reminders": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "number"
+                    },
+                    "unit": {
+                      "anyOf": [
+                        {
+                          "const": "minutes"
+                        },
+                        {
+                          "const": "hours"
+                        },
+                        {
+                          "const": "days"
+                        },
+                        {
+                          "const": "weeks"
+                        }
+                      ]
+                    },
+                    "time": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "unit"
+                  ]
+                }
+              }
+            ]
+          },
+          "recurrence": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "unit": {
+                    "anyOf": [
+                      {
+                        "const": "days"
+                      },
+                      {
+                        "const": "weeks"
+                      },
+                      {
+                        "const": "months"
+                      },
+                      {
+                        "const": "years"
+                      }
+                    ]
+                  },
+                  "interval": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "unit",
+                  "interval"
+                ]
+              }
+            ]
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "const": "alta"
+              },
+              {
+                "const": "media"
+              },
+              {
+                "const": "baja"
+              }
+            ]
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "status": {
+            "anyOf": [
+              {
+                "const": "active"
+              },
+              {
+                "const": "completed"
+              },
+              {
+                "const": "cancelled"
+              }
+            ]
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "createdAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "customerId": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "vehicleId": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "rentalId": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "paymentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "maintenanceId": {
+            "anyOf": [
+              {
+                "type": "string"
               }
             ]
           }
@@ -1031,6 +1233,73 @@
     "adminSettings": {
       "type": "object",
       "properties": {
+        "notifications": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "anyOf": [
+                    {
+                      "const": false
+                    },
+                    {
+                      "const": true
+                    }
+                  ]
+                },
+                "categories": {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "const": "mantenimiento"
+                      },
+                      {
+                        "const": "otro"
+                      },
+                      {
+                        "const": "multa"
+                      },
+                      {
+                        "const": "pago"
+                      },
+                      {
+                        "const": "alquiler"
+                      },
+                      {
+                        "const": "reserva"
+                      },
+                      {
+                        "const": "itv"
+                      },
+                      {
+                        "const": "impuesto"
+                      },
+                      {
+                        "const": "documento"
+                      },
+                      {
+                        "const": "entrega"
+                      },
+                      {
+                        "const": "devolución"
+                      }
+                    ]
+                  }
+                },
+                "timezone": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "enabled",
+                "categories",
+                "timezone"
+              ]
+            }
+          ]
+        },
         "name": {
           "type": "string"
         },

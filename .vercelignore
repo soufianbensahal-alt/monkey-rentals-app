@@ -1,0 +1,12 @@
+.agents
+.codex
+.git
+node_modules
+dist
+supabase
+Monkey Rentals Animación APP
+*.tsbuildinfo
+Imagen de Codex*.png
+
+.env*
+.vercel

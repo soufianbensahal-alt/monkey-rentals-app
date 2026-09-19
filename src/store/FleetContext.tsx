@@ -1,3 +1,4 @@
+import { clearDeviceOnLogout } from '../lib/pushNotifications'
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Monitor, Moon, ShieldCheck, Sun } from 'lucide-react'
 import { parseBackup, restoreBackup, type RestoreMode } from '../lib/backups'
@@ -373,6 +374,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const clearRemoteLogin = useCallback((message = '') => {
+    void clearDeviceOnLogout().catch(()=>{ /* Browser may be offline; backend also checks the auth session. */ })
     saveRemoteSession(null)
     initialCache.current = structuredClone(emptyState)
     remoteUpdatedAt.current = ''

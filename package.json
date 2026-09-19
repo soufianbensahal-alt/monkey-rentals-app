@@ -7,9 +7,11 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "notifications:prepare": "node scripts/generate-backup-schema.mjs && node scripts/sync-notification-shared.mjs"
   },
   "dependencies": {
+    "@js-temporal/polyfill": "0.5.1",
     "@tailwindcss/vite": "latest",
     "@vitejs/plugin-react": "latest",
     "lucide-react": "latest",
@@ -22,6 +24,7 @@
     "write-excel-file": "^4.1.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@eslint/js": "^9.39.2",
     "@testing-library/jest-dom": "latest",
     "@testing-library/react": "latest",
