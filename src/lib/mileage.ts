@@ -31,6 +31,10 @@ export function missingFinalMileage(rental: Rental) {
   return rental.status === 'finalizado' && rental.kmEnd === undefined
 }
 
+export function hasMileageAlert(rental: Rental) {
+  return missingFinalMileage(rental) && !rental.mileageAlertDismissed
+}
+
 export function getVehicleMileage(state: FleetState, vehicleId: string) {
   const today = new Date().toISOString().slice(0, 10)
   const vehicle = state.vehicles.find(v => v.id === vehicleId)

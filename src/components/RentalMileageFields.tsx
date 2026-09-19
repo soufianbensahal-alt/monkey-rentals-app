@@ -13,6 +13,7 @@ export function RentalMileageFields({ value, onChange, vehicle, days, finalized,
   return <section className="rounded-2xl border border-orange-100 p-4 sm:col-span-2" aria-label="Kilometraje del alquiler">
     <h3 className="font-display text-lg font-bold">Kilometraje del alquiler</h3>
     <p className="mt-1 text-sm text-stone-500">Registra el cuentakilómetros de entrega y devolución. Cobrar el exceso es opcional.</p>
+    <label className="mt-4 flex items-start gap-3"><input type="checkbox" checked={!!value.mileageAlertDismissed} onChange={e=>set({mileageAlertDismissed:e.target.checked})}/><span><span className="font-semibold">Descartar aviso de kilometraje de este alquiler</span><span className="mt-1 block text-sm text-stone-500">Para alquileres sin kilómetros pactados o que no requieren seguimiento. Desmárcalo para volver a recibir el aviso.</span></span></label>
     <div className="mt-4 grid gap-4 sm:grid-cols-2">
       {numeric('Km iniciales del vehículo', 'kmStart')}
       {numeric('Km finales del vehículo', 'kmEnd')}
@@ -31,7 +32,7 @@ export function RentalMileageFields({ value, onChange, vehicle, days, finalized,
         {!value.kmExtraEnabled && <p className="mt-1">Control de uso sin cargo por kilómetros extra.</p>}
       </div>
       {finalized && <>
-        {value.kmEnd === undefined && <p className="text-sm font-semibold text-amber-800 sm:col-span-2">Faltan km finales. Puedes guardarlo ahora y quedará un aviso para completar el kilometraje.</p>}
+        {!value.mileageAlertDismissed && value.kmEnd === undefined && <p className="text-sm font-semibold text-amber-800 sm:col-span-2">Faltan km finales. Puedes guardarlo ahora y quedará un aviso para completar el kilometraje.</p>}
         <label><span className="label">Estado de devolución</span><select className="field" value={value.returnCondition || ''} onChange={e => set({ returnCondition: e.target.value })}><option value="">Sin registrar</option><option>Sin incidencias</option><option>Con incidencias</option><option>Pendiente de revisión</option></select></label>
         <label className="sm:col-span-2"><span className="label">Notas de devolución</span><textarea className="field min-h-20" value={value.returnNotes || ''} onChange={e => set({ returnNotes: e.target.value })}/></label>
         {existingCharge ? <p className="text-sm text-stone-500 sm:col-span-2">Ya existe un cargo de km extra asociado. Puedes revisarlo en Pagos; no se creará otro al guardar.</p> : value.kmExtraEnabled && (calc.total ?? 0) > 0 && <label className="flex items-start gap-3 rounded-xl border border-orange-100 p-3 sm:col-span-2"><input type="checkbox" className="mt-1" checked={createCharge} onChange={e => onCreateCharge(e.target.checked)}/><span><strong>Crear pago pendiente por {euro.format(calc.total!)}</strong><span className="mt-1 block text-sm text-stone-500">He revisado el cálculo. El pago será único y quedará vinculado a este alquiler, cliente y vehículo.</span></span></label>}

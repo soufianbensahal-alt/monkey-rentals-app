@@ -39,6 +39,7 @@ export interface Customer {
 }
 
 export interface RentalMileage {
+  mileageAlertDismissed?: boolean
   kmStart?: number
   kmEnd?: number
   kmUsed?: number

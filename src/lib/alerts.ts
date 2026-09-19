@@ -1,5 +1,5 @@
 import { daysUntil, effectivePaymentStatus, isPaymentAlert } from './payments'
-import { missingFinalMileage } from './mileage'
+import { hasMileageAlert } from './mileage'
 import { vehicleLabel } from './vehicles'
 import type { FleetState } from '../types'
 
@@ -11,6 +11,7 @@ export interface SystemAlert {
   severity: 'danger' | 'warning' | 'info'
   to: string
   paymentId?: string
+  rentalId?: string
 }
 
 export function getSystemAlerts(state: FleetState): SystemAlert[] {
@@ -37,8 +38,8 @@ export function getSystemAlerts(state: FleetState): SystemAlert[] {
     const customer = state.customers.find(c => c.id === item.customerId)
     return { id:`fine-${item.id}`, title:item.status === 'reclamada' ? 'Multa reclamada' : 'Multa pendiente', detail:`${vehicleLabel(vehicle)} · ${customer?.name || 'Sin cliente vinculado'}`, date:item.infractionDate, severity:'warning' as const, to:`/app/documentacion?vehicle=${item.vehicleId}` }
   })
-  const mileage = state.rentals.filter(missingFinalMileage).map(rental => ({
-    id:`mileage-${rental.id}`, title:'Faltan km finales del alquiler.',
+  const mileage = state.rentals.filter(hasMileageAlert).map(rental => ({
+    id:`mileage-${rental.id}`, rentalId:rental.id, title:'Faltan km finales del alquiler.',
     detail:`${vehicleLabel(state.vehicles.find(v => v.id === rental.vehicleId))} · ${state.customers.find(c => c.id === rental.customerId)?.name || 'Cliente'}`,
     date:rental.endDate || rental.startDate, severity:'warning' as const,
     to:`/app/alquileres?edit=${encodeURIComponent(rental.id)}`,

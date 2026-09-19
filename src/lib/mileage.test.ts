@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { emptyState } from '../data/emptyState'
 import type { FleetState, Rental } from '../types'
-import { calculateMileage, getVehicleMileage, mileageReport, saveRentalMileage, validateMileage } from './mileage'
+import { calculateMileage, hasMileageAlert, getVehicleMileage, mileageReport, saveRentalMileage, validateMileage } from './mileage'
 import { buildReport } from './reports'
 import { getSystemAlerts } from './alerts'
 
@@ -14,6 +14,15 @@ export function mileageFixture(): FleetState {
 const rental: Rental = {id:'r1',vehicleId:'v1',customerId:'c1',startDate:'2026-09-01',endDate:'2026-09-05',agreedPrice:120,pricePeriod:'dia',durationDays:4,expectedKilometers:0,status:'finalizado',notes:'',kmStart:125400,kmEnd:126050,kmIncludedTotal:500,kmExtraEnabled:true}
 
 describe('Control de kilometraje', () => {
+  it('descarta el aviso sin ocultar la falta real de km ni cambiar cálculos', () => {
+    const state=mileageFixture()
+    const pending={...rental,kmEnd:undefined}
+    state.rentals=[pending,{...pending,id:'r2',mileageAlertDismissed:true}]
+    expect(mileageReport(state).missing).toHaveLength(2)
+    expect(getSystemAlerts(state).filter(a=>a.rentalId).map(a=>a.rentalId)).toEqual(['r1'])
+    expect(calculateMileage(state.rentals[1])).toEqual(calculateMileage(pending))
+    expect(hasMileageAlert({...state.rentals[1],mileageAlertDismissed:false})).toBe(true)
+  })
   it('calcula 650 km, 150 extra y 27,23 € con redondeo de base e IVA', () => {
     expect(calculateMileage(rental, mileageFixture().vehicles[0])).toEqual({used:650,extra:150,price:0.15,vatRate:21,base:22.5,vat:4.73,total:27.23})
     expect(calculateMileage({...rental,kmEnd:126000}, mileageFixture().vehicles[0])).toMatchObject({extra:100,base:15,vat:3.15,total:18.15})

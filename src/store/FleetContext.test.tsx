@@ -2,6 +2,18 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { FleetProvider, STORAGE_KEY, useFleet } from './FleetContext'
 
 describe('FleetContext',()=>{
+  it('persiste el descarte por alquiler sin borrar datos ni cambiar pagos',async()=>{
+    const {result,unmount}=renderHook(()=>useFleet(),{wrapper:FleetProvider})
+    const rental={id:'dismiss-test',vehicleId:'v',customerId:'c',startDate:'2026-09-01',agreedPrice:600,pricePeriod:'mes' as const,expectedKilometers:0,status:'finalizado' as const,notes:''}
+    act(()=>result.current.upsert('rentals',rental))
+    act(()=>result.current.dismissMileageAlert(rental.id))
+    expect(result.current.state.rentals[0]).toEqual({...rental,mileageAlertDismissed:true})
+    expect(result.current.state.payments).toEqual([])
+    await waitFor(()=>expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).rentals[0].mileageAlertDismissed).toBe(true))
+    unmount()
+    const restored=renderHook(()=>useFleet(),{wrapper:FleetProvider})
+    expect(restored.result.current.state.rentals[0].mileageAlertDismissed).toBe(true)
+  })
   beforeEach(()=>localStorage.clear())
 
   it('inicia vacío y con Jonathan como administrador',()=>{

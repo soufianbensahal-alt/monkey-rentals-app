@@ -16,6 +16,7 @@ const REMOTE_REFRESH_MIN_GAP_MS = 10000
 type Entity = Vehicle | Customer | Rental | Payment | ClientDocument | Task | MaintenanceRecord | Document | VehicleTax | Fine | CalendarEvent
 type Collection = 'vehicles' | 'customers' | 'rentals' | 'payments' | 'clientDocuments' | 'tasks' | 'maintenance' | 'documents' | 'taxes' | 'fines' | 'events'
 type Action =
+  | { type:'dismissMileageAlert'; id:string }
   | { type:'saveRentalMileage'; rental:Rental; createCharge:boolean; today:string }
   | { type:'hydrate'; state:FleetState }
   | { type:'upsert'; collection:Collection; item:Entity }
@@ -26,6 +27,7 @@ type Action =
   | { type:'reset' }
 
 function reducer(state: FleetState, action: Action): FleetState {
+  if (action.type === 'dismissMileageAlert') return { ...state, rentals:state.rentals.map(r => r.id === action.id ? {...r,mileageAlertDismissed:true} : r) }
   if (action.type === 'saveRentalMileage') return saveRentalMileage(state, action.rental, action.createCharge, action.today)
   if (action.type === 'hydrate') return action.state
   if (action.type === 'reset') return structuredClone(emptyState)
@@ -181,6 +183,7 @@ interface FleetContextValue {
   saveRental:(rental:Rental,createCharge:boolean)=>void
   upsert:(collection:Collection,item:Entity)=>void
   remove:(collection:Collection,id:string)=>void
+  dismissMileageAlert:(id:string)=>void
   toggleTask:(id:string)=>void
   markPaymentPaid:(id:string)=>void
   updateSettings:(settings:AdminSettings)=>void
@@ -454,6 +457,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     },
     upsert:(collection:Collection,item:Entity)=>dispatch({type:'upsert',collection,item}),
     remove:(collection:Collection,id:string)=>dispatch({type:'remove',collection,id}),
+    dismissMileageAlert:(id:string)=>dispatch({type:'dismissMileageAlert',id}),
     toggleTask:(id:string)=>dispatch({type:'toggleTask',id}),
     markPaymentPaid:(id:string)=>dispatch({type:'markPaymentPaid',id}),
     updateSettings:(settings:AdminSettings)=>dispatch({type:'settings',settings}),
