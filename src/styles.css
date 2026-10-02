@@ -266,12 +266,18 @@ button, a { -webkit-tap-highlight-color: transparent; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 
-.app-intro { position:fixed; z-index:100; inset:0; display:grid; place-items:center; overflow:hidden; padding:clamp(1.5rem,6vw,4rem); background:var(--app-bg); isolation:isolate; }
-.app-intro::before { content:""; position:absolute; z-index:-1; inset:0; background:radial-gradient(circle at 50% 46%, rgba(249,115,22,.13), transparent 34%); }
-.app-intro-logo-wrap { display:grid; place-items:center; width:min(65vw,22rem); aspect-ratio:1; animation:app-intro-logo 1.6s cubic-bezier(.22,.61,.36,1) both; }
-.app-intro-logo { display:block; width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 18px 28px rgba(23,32,29,.18)); }
-:root[data-theme="dark"] .app-intro::before { background:radial-gradient(circle at 50% 46%, rgba(249,115,22,.16), transparent 34%); }
-:root[data-theme="dark"] .app-intro-logo { filter:drop-shadow(0 18px 34px rgba(249,115,22,.2)); }
-@keyframes app-intro-logo { 0% { opacity:0; transform:scale(.85); } 19% { opacity:1; transform:scale(1); } 69% { opacity:1; transform:scale(1); } 100% { opacity:0; transform:scale(.96); } }
-@media (max-width:639px) { .app-intro-logo-wrap { width:min(65vw,15rem); } }
-@media (prefers-reduced-motion:reduce) { .app-intro-logo-wrap { animation:none; } }
+.app-intro { position:fixed; z-index:100; inset:0; display:grid; place-items:center; overflow:hidden; padding:clamp(1rem,4vw,3rem); background:#f6f3ec; isolation:isolate; animation:app-intro-exit 2.5s linear both; }
+.app-intro-logo-stage { width:min(78vw,100rem); aspect-ratio:1600/250; }
+.app-intro-logo-stage svg { display:block; width:100%; height:100%; overflow:visible; }
+.app-intro-symbol { width:100%; height:100%; opacity:0; transform:scale(.96); transform-origin:center; animation:app-intro-symbol .4s cubic-bezier(.22,0,.18,1) forwards; }
+.app-intro-symbol picture,.app-intro-symbol img { display:block; width:100%; height:100%; object-fit:contain; }
+.app-intro-reveal { width:0; animation:app-intro-reveal .9s .3s cubic-bezier(.22,0,.18,1) forwards; }
+.app-intro-glyph { opacity:0; transform:translateX(-11px); animation:app-intro-glyph .42s cubic-bezier(.22,0,.18,1) forwards; }
+.app-intro-sheen { opacity:0; transform:translateX(0); animation:app-intro-sheen .7s 1s ease-in-out forwards; }
+@keyframes app-intro-symbol { to { opacity:1; transform:scale(1); } }
+@keyframes app-intro-reveal { to { width:1330px; } }
+@keyframes app-intro-glyph { to { opacity:1; transform:translateX(0); } }
+@keyframes app-intro-sheen { 0% { opacity:0; transform:translateX(0); } 10% { opacity:1; } 90% { opacity:1; } 100% { opacity:0; transform:translateX(1450px); } }
+@keyframes app-intro-exit { 0%,88% { opacity:1; } 100% { opacity:0; } }
+@media (max-width:639px) { .app-intro-logo-stage { width:82vw; } }
+@media (prefers-reduced-motion:reduce) { .app-intro { animation:none; } .app-intro-symbol,.app-intro-reveal,.app-intro-glyph,.app-intro-sheen { animation:none; opacity:1; transform:none; } .app-intro-reveal { width:1330px; } }

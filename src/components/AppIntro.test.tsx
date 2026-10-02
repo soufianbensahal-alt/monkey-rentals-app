@@ -10,7 +10,10 @@ describe('AppIntro', () => {
     render(<AppIntro><main>Aplicacion</main></AppIntro>)
 
     expect(screen.getByRole('status', { name:'Iniciando Monkey Rentals' })).toBeInTheDocument()
-    act(() => vi.advanceTimersByTime(1600))
+    expect(document.querySelector('source')).toHaveAttribute('srcset','/intros/movil/monkey.png')
+    expect(document.querySelector('.app-intro-symbol img')).toHaveAttribute('src','/intros/pc/monkey.png')
+    expect(document.querySelectorAll('.app-intro-glyph').length).toBeGreaterThan(10)
+    act(() => vi.advanceTimersByTime(2500))
     expect(screen.queryByRole('status', { name:'Iniciando Monkey Rentals' })).not.toBeInTheDocument()
     expect(screen.getByText('Aplicacion')).toBeInTheDocument()
   })
