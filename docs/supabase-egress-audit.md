@@ -12,6 +12,7 @@ El segundo multiplicador estaba en los guardados del navegador. Cada acción des
 
 - El bundle público usa el proyecto `qwcpipfxzdjeolkcoggc`.
 - Producción contenía dos estados con 4.981.728 bytes en total. 4.950.049 caracteres eran imágenes de vehículos Base64: prácticamente todo el estado de la cuenta principal.
+- La proyección nueva de eventos y preferencias ocupa 2.922 bytes para esas mismas cuentas, el 0,0587 % del estado completo: una reducción calculada del 99,94 % en la carga del Cron.
 - Había tres dispositivos activos de dos usuarios. En las 24 horas previas aparecieron 1.075 lecturas del estado completo realizadas por el emisor antiguo, además de 1.106 verificaciones de sesión y 1.052 reclamaciones de avisos.
 - El Cron antiguo consultaba `fleet_state?select=state` por dispositivo y `notification_subscriptions?select=*` cada minuto.
 - No existen suscripciones Supabase Realtime en el cliente actual. La sincronización PC/móvil se basa en comprobación de `updated_at` y descarga condicional.
