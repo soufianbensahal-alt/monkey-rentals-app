@@ -11,8 +11,9 @@ El segundo multiplicador estaba en los guardados del navegador. Cada acción des
 ## Evidencia observada
 
 - El bundle público usa el proyecto `qwcpipfxzdjeolkcoggc`.
-- El conector Supabase disponible durante la auditoría apuntaba a otro proyecto, `xyprkjgmrtcvcgrzwhfg`. Por eso no se aplicaron cambios remotos al proyecto equivocado.
-- En ese proyecto auxiliar, las últimas 24 horas mostraban unas 1.400 ejecuciones de cada operación del Cron: configuración, consulta de suscripciones y actualización de `notification_runtime`. La función desplegada todavía consultaba suscripciones con `select=*`.
+- Producción contenía dos estados con 4.981.728 bytes en total. 4.950.049 caracteres eran imágenes de vehículos Base64: prácticamente todo el estado de la cuenta principal.
+- Había tres dispositivos activos de dos usuarios. En las 24 horas previas aparecieron 1.075 lecturas del estado completo realizadas por el emisor antiguo, además de 1.106 verificaciones de sesión y 1.052 reclamaciones de avisos.
+- El Cron antiguo consultaba `fleet_state?select=state` por dispositivo y `notification_subscriptions?select=*` cada minuto.
 - No existen suscripciones Supabase Realtime en el cliente actual. La sincronización PC/móvil se basa en comprobación de `updated_at` y descarga condicional.
 - Dashboard, Flota, Clientes, Pagos, Informes y Calendario no hacen consultas independientes: consumen el único `fleet_state` hidratado por el proveedor global. Cambiar de sección no debe volver a descargar el estado.
 - Las copias administrativas descargan todos los adjuntos, pero solo después de una acción explícita del usuario. No se encontró una generación automática oculta.
@@ -26,7 +27,7 @@ El segundo multiplicador estaba en los guardados del navegador. Cada acción des
 5. Las imágenes nuevas se convierten y comprimen; se generan miniaturas separadas. Los listados solicitan solo la miniatura cuando se acerca al viewport.
 6. Fotografías originales, facturas, PDFs y documentos completos solo se firman y descargan al pulsar Ver o Descargar.
 7. Las signed URLs se reutilizan durante 55 minutos con una vigencia de una hora para mantener una clave de caché estable.
-8. Flota, Clientes, Pagos e Informes están paginados. Esto limita miniaturas, nodos y trabajo por pantalla aunque el estado de negocio siga sincronizándose como una unidad.
+8. Flota, Alquileres, Clientes, Pagos e Informes están paginados. Esto limita miniaturas, nodos y trabajo por pantalla aunque el estado de negocio siga sincronizándose como una unidad.
 
 ## Peticiones esperadas después del cambio
 
@@ -68,6 +69,12 @@ La instrumentación se excluye de producción y de las pruebas automatizadas.
 - Búsqueda estática: no quedan `select=*` ni `select=state` en el código de ejecución, salvo la lectura inicial y de conflictos que selecciona `state,updated_at,user_id` de forma explícita.
 - `npm test`, `npm run lint` y `npm run build` pasan.
 
-## Despliegue pendiente en producción
+## Despliegue en producción
 
-La migración `20261003090732_reduce_egress_private_media.sql` crea los buckets y tablas privadas para documentos de clientes e imágenes de vehículos, con RLS y políticas por carpeta de usuario. También debe desplegarse la nueva versión de `notification-dispatch`. Ambos cambios deben aplicarse a `qwcpipfxzdjeolkcoggc`; el conector disponible en esta sesión no tiene acceso a ese proyecto.
+- Migración `reduce_egress_private_media` aplicada a `qwcpipfxzdjeolkcoggc`.
+- Buckets `client-documents` y `vehicle-images` privados, con RLS y políticas por carpeta de usuario verificadas.
+- `notification-dispatch` versión 7 activa. El código desplegado no contiene `select=*` ni `select=state`; usa la proyección de eventos y preferencias.
+- Frontend desplegado en Vercel como `dpl_99Y742BKVPoSP7yM5s1QomZZRJ7V` y asociado a `https://monkey-rentals-app.vercel.app`.
+- El bundle público apunta al proyecto correcto y contiene el `PATCH` que devuelve únicamente `updated_at,user_id`.
+
+Supabase continúa respondiendo HTTP 402 con `exceed_egress_quota`. El Cron se encola cada minuto, pero la restricción impide que alcance la función; por eso no es posible observar todavía una ejecución real de la proyección nueva. Cuando Supabase retire la restricción, la primera apertura autenticada migrará las imágenes Base64 al bucket privado y reducirá el estado sincronizado.
