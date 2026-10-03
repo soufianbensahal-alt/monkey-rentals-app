@@ -621,7 +621,7 @@ function LoginScreen({error,onSubmit}:{error:string;onSubmit:(email:string,passw
   }
   return <main className="login-screen grid min-h-dvh place-items-center bg-cream p-4">
     <form onSubmit={submit} className="login-card card w-full max-w-md p-6 sm:p-8">
-      <img src="/monkey-rentals-logo.png" alt="" className="mx-auto size-20 object-contain"/>
+      <img src="/monkey-logo.png" alt="" className="mx-auto size-20 object-contain"/>
       <h1 className="mt-4 text-center font-display text-2xl font-bold text-ink">Acceso Monkey Rentals</h1>
       <p className="mt-2 text-center text-sm text-stone-500">Inicia sesión para sincronizar la flota en todos los dispositivos.</p>
       <div className="login-theme-switcher mt-5" role="group" aria-label="Aspecto del login">

@@ -15,7 +15,7 @@ export function MonkeyLogoIntro() {
           <linearGradient id="app-intro-desktop-sheen"><stop offset="0" stopColor="#fff9ee" stopOpacity="0"/><stop offset=".5" stopColor="#fff9ee" stopOpacity=".24"/><stop offset="1" stopColor="#fff9ee" stopOpacity="0"/></linearGradient>
         </defs>
         <foreignObject x={logo.icon.x} y={logo.icon.y} width={logo.icon.width} height={logo.icon.height}>
-          <div className="app-intro-symbol"><img src="/intros/pc/monkey.png" alt=""/></div>
+          <div className="app-intro-symbol"><img src="/monkey-logo.png" alt=""/></div>
         </foreignObject>
         <g clipPath="url(#app-intro-desktop-reveal)"><Glyphs/><g className="app-intro-sheen" mask="url(#app-intro-desktop-letters)"><rect x="210" y="-40" width="54" height="340" fill="url(#app-intro-desktop-sheen)" transform="skewX(-14)"/></g></g>
       </svg>
@@ -29,7 +29,7 @@ export function MonkeyLogoIntro() {
         </defs>
         <g clipPath="url(#app-intro-mobile-reveal)"><Glyphs mobile/><g className="app-intro-sheen" mask="url(#app-intro-mobile-letters)"><rect x="210" y="-40" width="54" height="340" fill="url(#app-intro-mobile-sheen)" transform="skewX(-14)"/></g></g>
       </svg>
-      <img className="app-intro-mobile-monkey app-intro-symbol" src="/intros/movil/monkey.png" alt=""/>
+      <img className="app-intro-mobile-monkey app-intro-symbol" src="/monkey-logo.png" alt=""/>
     </div>
   </div>
 }

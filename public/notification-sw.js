@@ -27,7 +27,7 @@ self.addEventListener('push',event=>{
     const receipts=(await ownerStore('readonly',undefined,receiptKey))||[]
     if(receipts.includes(String(data.tag)))return
     const url=typeof data.url==='string'&&data.url.startsWith('/app/calendario?')?data.url:'/app/alertas'
-    await self.registration.showNotification('Monkey Rentals',{body:String(data.body||'Tienes un recordatorio pendiente.'),icon:'/android-chrome-192x192.png',badge:'/android-chrome-192x192.png',tag:String(data.tag),renotify:false,data:{url,ownerId:owner}})
+    await self.registration.showNotification('Monkey Rentals',{body:String(data.body||'Tienes un recordatorio pendiente.'),icon:'/monkey-icon-192.png',badge:'/monkey-icon-192.png',tag:String(data.tag),renotify:false,data:{url,ownerId:owner}})
     await ownerStore('readwrite',[...receipts.slice(-999),String(data.tag)],receiptKey)
   })
   event.waitUntil(pushQueue)
