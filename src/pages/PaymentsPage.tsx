@@ -7,6 +7,8 @@ import { date, euro, euroWithCents, uid } from '../lib/format'
 import { effectivePaymentStatus } from '../lib/payments'
 import { isFlexiblePayment, paymentKindLabel, paymentReminderLabel, paymentTypeLabels, recurrenceFromFrequency, reminderFrequencyLabels } from '../lib/paymentReminders'
 import { vehicleLabel } from '../lib/vehicles'
+import { usePagination } from '../lib/pagination'
+import { ListPagination } from '../components/ListPagination'
 import type { Payment, PaymentStatus, PaymentType, ReminderFrequency } from '../types'
 
 const tones = { pagado:'success', pendiente:'warning', atrasado:'danger', flexible:'info', cancelado:'neutral' } as const
@@ -35,6 +37,7 @@ export default function PaymentsPage() {
     const haystack = `${item.customer?.name} ${vehicleLabel(item.vehicle)} ${item.vehicle?.plate} ${item.payment.dueDate} ${item.status} ${paymentKindLabel(item.payment)} ${paymentReminderLabel(item.payment)}`.toLowerCase()
     return matchesFilter && haystack.includes(deferred.toLowerCase())
   }), [decorated, filter, deferred])
+  const pagination=usePagination(rows,25)
   const paid = (state.debtPayments||[]).reduce((s,p)=>s+p.amount,0) + decorated.filter(item => item.status === 'pagado').reduce((sum, item) => sum + item.payment.amount, 0)
   const pending = decorated.filter(item => item.status !== 'pagado' && item.status !== 'cancelado').reduce((sum, item) => sum + item.payment.amount, 0)
   const overdue = decorated.filter(item => item.status === 'atrasado').reduce((sum, item) => sum + item.payment.amount, 0)
@@ -115,7 +118,7 @@ export default function PaymentsPage() {
     <div className="table-shell mt-5">
       {state.payments.length ? rows.length ? <table className="data-table">
         <thead><tr><th>Cliente y vehículo</th><th>Fecha</th><th>Tipo</th><th>Estado</th><th>Recordatorio</th><th>Importe</th><th>Acciones</th></tr></thead>
-        <tbody>{rows.map(({ payment, customer, vehicle, status, flexible }) => <tr key={payment.id}>
+        <tbody>{pagination.visible.map(({ payment, customer, vehicle, status, flexible }) => <tr key={payment.id}>
           <td><p className="font-bold">{customer?.name || 'Cliente no disponible'}</p><p className="text-xs text-stone-500">{vehicleLabel(vehicle)} · {vehicle?.plate}</p></td>
           <td>{date(payment.dueDate)}{payment.paidDate && <span className="block text-xs text-stone-500">Pagado: {date(payment.paidDate)}</span>}</td>
           <td>{paymentKindLabel(payment)}{payment.mileageCharge && <span className="mt-1 block max-w-xs text-xs text-stone-500">{payment.kmExtraRelated} km × {euroWithCents.format(payment.kmExtraPrice || 0)} · Base {euroWithCents.format(payment.kmExtraBaseAmount || 0)} + IVA {payment.kmExtraVatRate}% ({euroWithCents.format(payment.kmExtraVatAmount || 0)})</span>}{flexible && payment.flexibleNotes && <span className="block text-xs text-stone-500">{payment.flexibleNotes}</span>}</td>
@@ -125,6 +128,7 @@ export default function PaymentsPage() {
           <td><div className="flex items-center gap-3">{status !== 'pagado' && status !== 'cancelado' && <button className="btn-primary min-h-9 px-3 py-1 text-xs" onClick={() => markPaymentPaid(payment.id)}><Check size={15}/> Pagado</button>}<button onClick={() => open(payment)} aria-label="Editar pago" className="text-stone-500 hover:text-brand-600"><Pencil size={18}/></button><ConfirmButton title="Eliminar pago" message="¿Seguro que quieres eliminar este pago? Esta acción no se puede deshacer." onConfirm={() => remove('payments', payment.id)}/></div></td>
         </tr>)}</tbody>
       </table> : <EmptyState title="No hay pagos que coincidan." description="Ajusta la búsqueda o cambia el filtro para ver más resultados."/> : <EmptyState title="No hay pagos registrados." description="Los pagos creados desde alquileres aparecerán aquí." action={state.rentals.length ? <button className="btn-primary" onClick={() => open(blank())}><Plus size={18}/> Registrar pago</button> : undefined}/>}
+      <ListPagination page={pagination.page} pages={pagination.pages} total={pagination.total} onPage={pagination.setPage}/>
     </div>
     {editing && <Modal title={editing.id ? 'Editar pago' : 'Registrar pago'} onClose={() => setEditing(null)}>
       <form onSubmit={save} className="grid gap-4 sm:grid-cols-2">

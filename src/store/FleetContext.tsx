@@ -8,13 +8,14 @@ import { emptyState } from '../data/emptyState'
 import { fetchRemoteMeta, fetchRemoteState, getRememberRemoteSession, getRemoteOwnerId, readRemoteSession, refreshRemoteSession, remoteEnabled, saveRemoteSession, saveRemoteState, saveRemoteChanges, setRememberRemoteSession, signInRemote, signOutRemote, type RemoteSession, type RemoteStatus } from '../lib/remoteStore'
 import { saveRentalMileage } from '../lib/mileage'
 import { getNextPaymentDate } from '../lib/paymentReminders'
+import { migrateLegacyMedia } from '../lib/legacyMediaMigration'
+import { REMOTE_ACTIVE_WINDOW_MS, REMOTE_REFRESH_INTERVAL_MS, shouldPollRemote } from '../lib/syncPolicy'
 import { applyLoginTheme, applyTheme, getSavedLoginThemeMode, getSavedTheme, saveLoginThemeMode, type ThemeMode } from '../lib/theme'
 import type { ClientDebt, DebtPayment, AdminSettings, CalendarEvent, ClientDocument, Customer, Document, Fine, FleetState, MaintenanceRecord, Payment, Rental, Task, Vehicle, VehicleTax } from '../types'
 
 export const STORAGE_KEY = 'monkey-rentals-flota:v4'
 const LEGACY_STORAGE_KEYS = ['monkey-rentals-flota:v3','monkey-rentals-flota:v2']
 const REMOTE_SAVE_DEBOUNCE_MS = 1200
-const REMOTE_REFRESH_INTERVAL_MS = 5000
 const REMOTE_REFRESH_MIN_GAP_MS = 3000
 type Entity = ClientDebt | DebtPayment | Vehicle | Customer | Rental | Payment | ClientDocument | Task | MaintenanceRecord | Document | VehicleTax | Fine | CalendarEvent
 type Collection = 'debts' | 'debtPayments' | 'vehicles' | 'customers' | 'rentals' | 'payments' | 'clientDocuments' | 'tasks' | 'maintenance' | 'documents' | 'taxes' | 'fines' | 'events'
@@ -230,10 +231,12 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   const lastSyncedState = useRef(JSON.stringify(state))
   const lastRefreshAt = useRef(0)
   const lastRemoteSuccessAt = useRef(0)
+  const lastActivityAt = useRef(0)
   const hydrateRequestId = useRef(0)
   const stateRef = useRef(state)
 
   useEffect(() => { stateRef.current = state }, [state])
+  useEffect(() => { lastActivityAt.current = Date.now() }, [])
 
   const saving=useRef<Promise<void>|null>(null)
   const applyAction=useCallback((action:Action)=>{
@@ -246,7 +249,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     const snapshot=stateRef.current
     const base=JSON.parse(lastSyncedState.current) as FleetState
     const work=(async()=>{
-      const remote=await saveRemoteChanges(snapshot,base,currentSession)
+      const remote=await saveRemoteChanges(snapshot,base,currentSession,remoteUpdatedAt.current)
       if(getRemoteOwnerId(readRemoteSession())!==getRemoteOwnerId(currentSession))return
       lastRemoteSuccessAt.current=Date.now()
       const merged=mergeFleetState(snapshot,stateRef.current,remote.state)
@@ -280,13 +283,20 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       const remote = await fetchRemoteState(currentSession)
       if(requestId!==hydrateRequestId.current)return
       if (remote) {
-        const remoteState = normalizeState(remote.state)
+        let remoteState = normalizeState(remote.state)
         const cached=readCachedState(cacheKey,false)
         const baseline=parseCachedState(localStorage.getItem(`${cacheKey}:synced`))
         // Keep the original comparison base if merging detects a conflict.
         // Treating the remote copy as that base would let a later retry overwrite it.
         if(baseline)lastSyncedState.current=JSON.stringify(baseline)
-        const merged=cached&&baseline?mergeFleetState(baseline,cached,remoteState):remoteState
+        let merged=cached&&baseline?mergeFleetState(baseline,cached,remoteState):remoteState
+        if(merged.vehicles.some(vehicle=>vehicle.image?.startsWith('data:image/'))||merged.clientDocuments.some(document=>document.dataUrl?.startsWith('data:'))){
+          const migration=await migrateLegacyMedia(merged)
+          if(migration.migrated){
+            const saved=await saveRemoteChanges(migration.state,remoteState,currentSession,remote.updated_at)
+            remoteState=normalizeState(saved.state);merged=remoteState;remote.updated_at=saved.updated_at
+          }
+        }
         if(getRemoteOwnerId(readRemoteSession())!==getRemoteOwnerId(currentSession))return
         remoteUpdatedAt.current = remote.updated_at
         lastSyncedState.current = JSON.stringify(remoteState)
@@ -361,9 +371,12 @@ export function FleetProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!remoteEnabled || !session) return
-    const refresh = async () => {
+    const markActivity=()=>{lastActivityAt.current=Date.now()}
+    const refresh = async (force=false) => {
       const snapshot=stateRef.current
       const now = Date.now()
+      if(!force&&!shouldPollRemote(now,lastActivityAt.current,document.hidden))return
+      if(force&&document.hidden)return
       if (now - lastRefreshAt.current < REMOTE_REFRESH_MIN_GAP_MS) return
       lastRefreshAt.current = now
       try {
@@ -400,11 +413,14 @@ export function FleetProvider({ children }: { children: ReactNode }) {
         setSyncError(error instanceof Error ? error.message : 'No se ha podido comprobar la sincronización remota.')
       }
     }
-    const onFocus = () => { if (!document.hidden) void refresh() }
+    const onFocus = () => { if (!document.hidden) void refresh(true) }
+    const onOnline = () => { if (!document.hidden) void refresh(true) }
+    for(const event of ['pointerdown','keydown','touchstart'] as const)window.addEventListener(event,markActivity,{passive:true})
     window.addEventListener('focus', onFocus)
+    window.addEventListener('online',onOnline)
     document.addEventListener('visibilitychange', onFocus)
-    const interval = window.setInterval(refresh, REMOTE_REFRESH_INTERVAL_MS)
-    return () => { window.removeEventListener('focus', onFocus); document.removeEventListener('visibilitychange', onFocus); window.clearInterval(interval) }
+    const interval = window.setInterval(()=>void refresh(false), REMOTE_REFRESH_INTERVAL_MS)
+    return () => { for(const event of ['pointerdown','keydown','touchstart'] as const)window.removeEventListener(event,markActivity);window.removeEventListener('focus', onFocus);window.removeEventListener('online',onOnline);document.removeEventListener('visibilitychange', onFocus);window.clearInterval(interval) }
   }, [session,persistChanges])
 
   useEffect(()=>{
@@ -527,8 +543,11 @@ export function FleetProvider({ children }: { children: ReactNode }) {
 
   useEffect(()=>{
     if(!session||syncStatus!=='offline')return
-    const interval=window.setInterval(()=>void retrySync(),15000)
-    return()=>window.clearInterval(interval)
+    const retry=()=>{if(!document.hidden&&Date.now()-lastActivityAt.current<=REMOTE_ACTIVE_WINDOW_MS)void retrySync()}
+    const online=()=>{if(!document.hidden)void retrySync()}
+    window.addEventListener('online',online)
+    const interval=window.setInterval(retry,60000)
+    return()=>{window.removeEventListener('online',online);window.clearInterval(interval)}
   },[session,syncStatus,retrySync])
 
   const value = useMemo(() => ({

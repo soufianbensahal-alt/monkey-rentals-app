@@ -6,6 +6,8 @@ Las alertas configurables viven en `fleet_state.state.events` y las preferencias
 
 Las tablas nuevas guardan dispositivos y resultados de envío. El navegador solo puede consultar sus propias filas. Las altas, bajas y envíos pasan por Edge Functions autenticadas. La función de dispositivos valida el token con Supabase Auth y la sesión activa; el emisor comprueba que la sesión siga vigente antes de enviar. Al cerrar sesión, la app elimina la suscripción local y el Service Worker borra la vinculación con esa cuenta.
 
+El emisor no debe seleccionar el JSON completo de `fleet_state`. Solo proyecta `state.events` y `state.adminSettings.notifications`, y comparte esa lectura entre los dispositivos del mismo usuario durante cada ejecución. Esto evita transferir fotografías, documentos y el resto del estado una vez por minuto.
+
 ## Activación y despliegue
 
 Backend activado el 19/09/2026 en `monkey-rentals-app` (`qwcpipfxzdjeolkcoggc`). Las funciones `notification-device` y `notification-dispatch` están desplegadas; Cron ejecuta el emisor cada minuto. Verificada respuesta HTTP 200 y señal de salud. No había dispositivos registrados durante la verificación. Frontend publicado en `https://monkey-rentals-app.vercel.app` (despliegue `dpl_9TT94a5xjxEwoD4e3pGAGNsnutKJ`). Verificados HTTP 200 del calendario, manifest y Service Worker; preflight de registro 204 y rechazo sin autenticación 401.

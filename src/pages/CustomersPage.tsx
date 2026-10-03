@@ -6,7 +6,10 @@ import { MileageHistory } from '../components/MileageHistory'
 import { useFleet } from '../store/FleetContext'
 import { date, euro, uid } from '../lib/format'
 import { effectivePaymentStatus } from '../lib/payments'
-import type { ClientDocument, ClientDocumentType, Customer } from '../types'
+import { deletePrivateFile, privateFileUrl, uploadPrivateFile } from '../lib/privateFiles'
+import { usePagination } from '../lib/pagination'
+import { ListPagination } from '../components/ListPagination'
+import type { ClientDocument, ClientDocumentType, Customer, PrivateFile } from '../types'
 
 const blank: Customer = { id:'', name:'', email:'', phone:'', dni:'', company:'', rentals:0 }
 const documentTypes: ClientDocumentType[] = ['DNI / NIE', 'Pasaporte', 'Carnet de conducir', 'Contrato firmado', 'Justificante', 'Otro']
@@ -14,18 +17,20 @@ const acceptedDocumentTypes = ['application/pdf', 'image/jpeg', 'image/png', 'im
 const maxDocumentSize = 10 * 1024 * 1024
 
 export default function CustomersPage() {
-  const { state, upsert, remove } = useFleet()
+  const { state, upsert, upsertConfirmed, remove, remoteEnabled } = useFleet()
   const [query, setQuery] = useState('')
   const deferred = useDeferredValue(query)
   const [editing, setEditing] = useState<Customer | null>(null)
   const [documentCustomer, setDocumentCustomer] = useState<Customer | null>(null)
   const [documentError, setDocumentError] = useState('')
-  const [selectedDocumentFile, setSelectedDocumentFile] = useState<{ fileName: string; mimeType: string; size: number; dataUrl: string } | null>(null)
+  const [selectedDocumentFile, setSelectedDocumentFile] = useState<File | null>(null)
+  const [documentBusy,setDocumentBusy]=useState(false)
 
   const rows = useMemo(() => state.customers.filter(customer => {
     const customerDocs = state.clientDocuments.filter(document => document.customerId === customer.id)
     return `${customer.name} ${customer.email} ${customer.phone} ${customer.dni} ${customer.company} ${customerDocs.map(document => `${document.type} ${document.fileName}`).join(' ')}`.toLowerCase().includes(deferred.toLowerCase())
   }), [state.customers, state.clientDocuments, deferred])
+  const pagination=usePagination(rows,18)
 
   const today = new Date().toISOString().slice(0, 10)
   const openDocumentModal = (customer: Customer) => {
@@ -59,28 +64,29 @@ export default function CustomersPage() {
       setDocumentError('El archivo supera el máximo de 10 MB.')
       return
     }
-    const reader = new FileReader()
-    reader.onload = () => setSelectedDocumentFile({ fileName:file.name, mimeType:file.type, size:file.size, dataUrl:String(reader.result) })
-    reader.onerror = () => setDocumentError('No se ha podido leer el archivo.')
-    reader.readAsDataURL(file)
+    setSelectedDocumentFile(file)
   }
-  const saveDocument = (event: FormEvent<HTMLFormElement>) => {
+  const saveDocument = async(event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!documentCustomer || !selectedDocumentFile) {
       setDocumentError('Selecciona un archivo para guardarlo.')
       return
     }
     const form = new FormData(event.currentTarget)
-    upsert('clientDocuments', {
-      id:uid('cd'),
-      customerId:documentCustomer.id,
-      type:String(form.get('type')) as ClientDocumentType,
-      ...selectedDocumentFile,
-      uploadedAt:new Date().toISOString(),
-      notes:String(form.get('notes')).trim(),
-    })
-    setDocumentCustomer(null)
+    const id=uid('cd'),type=String(form.get('type')) as ClientDocumentType,notes=String(form.get('notes')).trim()
+    setDocumentBusy(true);setDocumentError('')
+    try {
+      if(remoteEnabled){
+        const stored=await uploadPrivateFile(selectedDocumentFile,{type:'client',recordId:id,customerId:documentCustomer.id,documentType:type,notes}) as ClientDocument
+        await upsertConfirmed('clientDocuments',stored)
+      }else{
+        const dataUrl=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error('No se ha podido leer el archivo.'));reader.readAsDataURL(selectedDocumentFile)})
+        upsert('clientDocuments',{id,customerId:documentCustomer.id,type,fileName:selectedDocumentFile.name,mimeType:selectedDocumentFile.type,size:selectedDocumentFile.size,dataUrl,uploadedAt:new Date().toISOString(),notes})
+      }
+      setDocumentCustomer(null)
+    }catch(error){setDocumentError(error instanceof Error?error.message:'No se ha podido guardar el documento.')}finally{setDocumentBusy(false)}
   }
+  const deleteDocument=async(document:ClientDocument)=>{if(document.path)await deletePrivateFile(document as PrivateFile,'client');remove('clientDocuments',document.id)}
 
   return <div className="fade-up">
     <PageHeader
@@ -96,7 +102,7 @@ export default function CustomersPage() {
     </label>}
 
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {rows.map(customer => {
+      {pagination.visible.map(customer => {
         const rentals = state.rentals.filter(rental => rental.customerId === customer.id)
         const rentalIds = rentals.map(rental => rental.id)
         const documents = state.clientDocuments.filter(document => document.customerId === customer.id)
@@ -130,7 +136,7 @@ export default function CustomersPage() {
             {futureReservation && <Badge tone="info">Reserva {date(futureReservation.startDate)}</Badge>}
           </div>}
           <MileageHistory rentals={rentals} state={state}/>
-          <Debts customerId={customer.id}/><CustomerDocuments documents={documents} onAdd={() => openDocumentModal(customer)} onDelete={id => remove('clientDocuments', id)}/>
+          <Debts customerId={customer.id}/><CustomerDocuments documents={documents} onAdd={() => openDocumentModal(customer)} onDelete={deleteDocument}/>
         </article>
       })}
       {!rows.length && <div className="card md:col-span-2 xl:col-span-3">
@@ -141,6 +147,7 @@ export default function CustomersPage() {
         />
       </div>}
     </div>
+    <ListPagination page={pagination.page} pages={pagination.pages} total={pagination.total} onPage={pagination.setPage}/>
 
     {editing && <Modal title={editing.id ? 'Editar cliente' : 'Nuevo cliente'} onClose={() => setEditing(null)}>
       <form className="grid gap-4 sm:grid-cols-2" onSubmit={saveCustomer}>
@@ -162,18 +169,18 @@ export default function CustomersPage() {
           <span className="label">Archivo *</span>
           <span className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
             <span className="btn-primary inline-flex w-fit"><Upload size={18}/> Seleccionar archivo</span>
-            <span className="text-sm text-stone-500">{selectedDocumentFile?.fileName || 'PDF, JPG, PNG o WebP. Máximo 10 MB.'}</span>
+            <span className="text-sm text-stone-500">{selectedDocumentFile?.name || 'PDF, JPG, PNG o WebP. Máximo 10 MB.'}</span>
           </span>
           <input className="sr-only" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp" onChange={event => onFileChange(event.currentTarget.files?.[0])}/>
         </label>
         <label><span className="label">Notas</span><textarea className="field min-h-24" name="notes" placeholder="Ej. DNI renovado, contrato firmado en oficina..."/></label>
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><button type="button" className="btn-secondary" onClick={() => setDocumentCustomer(null)}>Cancelar</button><button className="btn-primary">Guardar documento</button></div>
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><button type="button" className="btn-secondary" disabled={documentBusy} onClick={() => setDocumentCustomer(null)}>Cancelar</button><button className="btn-primary" disabled={documentBusy}>{documentBusy?'Guardando…':'Guardar documento'}</button></div>
       </form>
     </Modal>}
   </div>
 }
 
-function CustomerDocuments({ documents, onAdd, onDelete }: { documents: ClientDocument[]; onAdd: () => void; onDelete: (id: string) => void }) {
+function CustomerDocuments({ documents, onAdd, onDelete }: { documents: ClientDocument[]; onAdd: () => void; onDelete: (document:ClientDocument) => void|Promise<void> }) {
   return <section className="mt-5 rounded-2xl border border-orange-100 bg-brand-50/30 p-4">
     <div className="flex items-center justify-between gap-3">
       <div>
@@ -193,13 +200,12 @@ function CustomerDocuments({ documents, onAdd, onDelete }: { documents: ClientDo
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
-          {document.dataUrl ? <><a className="btn-secondary min-h-9 px-3 py-1.5 text-xs" href={document.dataUrl} target="_blank" rel="noreferrer"><Eye size={15}/> Ver</a>
-          <a className="btn-secondary min-h-9 px-3 py-1.5 text-xs" href={document.dataUrl} download={document.fileName}><Download size={15}/> Descargar</a></> : <span className="text-xs text-stone-500">Archivo no incluido en la copia. Vuelve a adjuntarlo.</span>}
+          {document.dataUrl||document.path?<CustomerDocumentActions document={document}/>:<span className="text-xs text-stone-500">Archivo no incluido en la copia. Vuelve a adjuntarlo.</span>}
           <ConfirmButton
             className="btn-secondary min-h-9 px-3 py-1.5 text-xs text-red-700"
             title="Eliminar documento"
             message="¿Seguro que quieres eliminar este documento del cliente? Esta acción no se puede deshacer."
-            onConfirm={() => onDelete(document.id)}
+            onConfirm={() => void onDelete(document)}
           />
         </div>
       </article>)}
@@ -208,6 +214,14 @@ function CustomerDocuments({ documents, onAdd, onDelete }: { documents: ClientDo
       <button type="button" className="btn-primary mt-3" onClick={onAdd}><Plus size={18}/> Añadir documento</button>
     </div>}
   </section>
+}
+
+function CustomerDocumentActions({document:fileDocument}:{document:ClientDocument}) {
+  const [full,setFull]=useState(''),[loading,setLoading]=useState(false),[error,setError]=useState('')
+  const url=async(download=false)=>fileDocument.dataUrl||privateFileUrl(fileDocument as PrivateFile,'client',download)
+  const open=async()=>{setLoading(true);setError('');try{setFull(await url())}catch{setError('No se ha podido abrir el documento.')}finally{setLoading(false)}}
+  const download=async()=>{setLoading(true);setError('');try{const link=document.createElement('a');link.href=await url(true);link.download=fileDocument.fileName;link.target='_blank';link.rel='noopener';link.click()}catch{setError('No se ha podido descargar el documento.')}finally{setLoading(false)}}
+  return <><button type="button" disabled={loading} className="btn-secondary min-h-9 px-3 py-1.5 text-xs" onClick={()=>void open()}><Eye size={15}/> Ver</button><button type="button" disabled={loading} className="btn-secondary min-h-9 px-3 py-1.5 text-xs" onClick={()=>void download()}><Download size={15}/> Descargar</button>{error&&<span className="text-xs text-red-700">{error}</span>}{full&&<Modal title={fileDocument.fileName} onClose={()=>setFull('')} wide>{fileDocument.mimeType==='application/pdf'?<iframe src={full} title={fileDocument.fileName} className="h-[72dvh] w-full rounded-xl border"/>:<img src={full} alt={fileDocument.fileName} className="mx-auto max-h-[72dvh] max-w-full object-contain"/>}</Modal>}</>
 }
 
 function Field({ label, name, value, type = 'text', required = false }: { label: string; name: string; value: string; type?: string; required?: boolean }) {

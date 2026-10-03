@@ -1,15 +1,16 @@
 import { Download, Eye, FileText, Trash2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { privateFileUrl, privateThumbnailUrl } from '../lib/privateFiles'
 import type { PrivateFile } from '../types'
 import { Modal } from './ui'
 
 export function PrivateFileView({file,target,onRemove}:{file:PrivateFile;target:'maintenance'|'rental';onRemove?:()=>void}) {
   const [thumbnail,setThumbnail]=useState(''),[full,setFull]=useState(''),[error,setError]=useState(''),[loading,setLoading]=useState(false)
-  useEffect(()=>{let active=true;if(file.thumbnailPath)void privateThumbnailUrl(file,target).then(url=>active&&setThumbnail(url)).catch(()=>active&&setError('Miniatura no disponible'));return()=>{active=false}},[file,target])
+  const card=useRef<HTMLDivElement>(null)
+  useEffect(()=>{let active=true,observer:IntersectionObserver|undefined;const load=()=>{if(file.thumbnailPath)void privateThumbnailUrl(file,target).then(url=>active&&setThumbnail(url)).catch(()=>active&&setError('Miniatura no disponible'))};if(!file.thumbnailPath)return()=>{active=false};if(typeof IntersectionObserver==='undefined')load();else{observer=new IntersectionObserver(items=>{if(items.some(item=>item.isIntersecting)){observer?.disconnect();load()}},{rootMargin:'160px'});if(card.current)observer.observe(card.current)}return()=>{active=false;observer?.disconnect()}},[file,target])
   const open=async()=>{setLoading(true);setError('');try{setFull(await privateFileUrl(file,target))}catch{setError('No se ha podido abrir el archivo.')}finally{setLoading(false)}}
   const download=async()=>{setLoading(true);setError('');try{const url=await privateFileUrl(file,target,true);const link=document.createElement('a');link.href=url;link.download=file.fileName;link.target='_blank';link.rel='noopener';link.click()}catch{setError('No se ha podido descargar el archivo.')}finally{setLoading(false)}}
-  return <div className="w-full max-w-52 rounded-xl border border-orange-100 bg-white p-2">
+  return <div ref={card} className="w-full max-w-52 rounded-xl border border-orange-100 bg-white p-2">
     <button type="button" onClick={()=>void open()} className="block w-full text-left" disabled={loading}>
       {thumbnail?<img src={thumbnail} alt="" loading="lazy" className="h-24 w-full rounded-lg object-cover"/>:<span className="grid h-24 place-items-center rounded-lg bg-stone-100 text-stone-500"><FileText size={32}/></span>}
       <span className="mt-2 block truncate text-xs font-bold text-ink" title={file.fileName}>{file.fileName}</span>

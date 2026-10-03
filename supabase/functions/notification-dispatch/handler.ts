@@ -2,8 +2,9 @@ import webpush from '../_shared/webpush.ts'
 import { Temporal } from '@js-temporal/polyfill'
 import { db, env, configured, rpc, allowedEndpoint, loadNotificationConfig } from '../_shared/server.ts'
 import { occurrences, dateInZone, validateReminder } from '../_shared/reminders.ts'
-import type { CalendarEvent, FleetState } from '../_shared/types.ts'
+import type { CalendarEvent } from '../_shared/types.ts'
 interface Subscription {created_at?:string;id:string;user_id:string;session_id:string;endpoint:string;keys:{p256dh:string;auth:string}}
+interface NotificationProjection {events?:CalendarEvent[];notifications?:{enabled?:boolean;categories?:string[]}}
 async function digest(value:string) {return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))).map(b=>b.toString(16).padStart(2,'0')).join('')}
 export const handleDispatch=async (request:Request)=>{
   if(request.method!=='POST')return new Response('Method not allowed',{status:405})
@@ -20,16 +21,25 @@ export const handleDispatch=async (request:Request)=>{
   const now=new Date(), cutoff=new Date(now.getTime()-24*3600000)
   let claimed=0,sent=0,failed=0
   try {
+    const projections=new Map<string,Promise<NotificationProjection|undefined>>()
+    const projection=(userId:string,fresh=false)=>{
+      if(fresh)projections.delete(userId)
+      let pending=projections.get(userId)
+      if(!pending){
+        pending=db(`fleet_state?user_id=eq.${userId}&select=events:state->events,notifications:state->adminSettings->notifications&limit=1`).then(rows=>rows[0] as NotificationProjection|undefined)
+        projections.set(userId,pending)
+      }
+      return pending
+    }
     // Pagination prevents silently ignoring devices after the PostgREST row limit.
     for(let page=0;page<100;page++) {
-      const devices:Subscription[]=await db(`notification_subscriptions?active=eq.true&select=*&order=id&limit=100&offset=${page*100}`)
+      const devices:Subscription[]=await db(`notification_subscriptions?active=eq.true&select=id,user_id,session_id,endpoint,keys,created_at&order=id&limit=100&offset=${page*100}`)
       for(const device of devices) {
         if(!allowedEndpoint(device.endpoint))continue
         if(!await rpc('notification_session_active',{owner:device.user_id,session:device.session_id}))continue
-        const rows=await db(`fleet_state?user_id=eq.${device.user_id}&select=state&limit=1`)
-        const state=rows[0]?.state as FleetState|undefined
-        const prefs=state?.adminSettings?.notifications
-        if(!state||!prefs?.enabled||!Array.isArray(prefs.categories)||!Array.isArray(state.events))continue
+        const state=await projection(device.user_id)
+        const prefs=state?.notifications
+        if(!prefs?.enabled||!Array.isArray(prefs.categories)||!Array.isArray(state?.events))continue
         for(const event of state.events.slice(0,5000)) {
           if(!event||!event.revision||!event.updatedAt||!prefs.categories.includes(event.type)||validateReminder(event))continue
           const from=dateInZone(cutoff,event.timezone)
@@ -46,10 +56,9 @@ export const handleDispatch=async (request:Request)=>{
               if(!accepted)continue
               claimed++
               // Read back the event after claim so edits/deletions invalidate pending work.
-              const freshRows=await db(`fleet_state?user_id=eq.${device.user_id}&select=state&limit=1`)
-              const fresh=freshRows[0]?.state as FleetState|undefined
-              const latest=fresh?.events.find((e:CalendarEvent)=>e.id===event.id)
-              const freshPrefs=fresh?.adminSettings?.notifications
+              const fresh=await projection(device.user_id,true)
+              const latest=fresh?.events?.find((e:CalendarEvent)=>e.id===event.id)
+              const freshPrefs=fresh?.notifications
               if(!latest||latest.revision!==event.revision||latest.status==='completed'||latest.status==='cancelled'||!freshPrefs?.enabled||!freshPrefs.categories.includes(event.type)) {
                 await db(`notification_deliveries?delivery_key=eq.${deliveryKey}`,{method:'PATCH',body:JSON.stringify({status:'cancelled'})});continue
               }

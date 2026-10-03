@@ -220,6 +220,20 @@
               }
             ]
           },
+          "imagePath": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "imageThumbnailPath": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
           "notes": {
             "type": "string"
           }
@@ -402,6 +416,79 @@
           },
           "notes": {
             "type": "string"
+          },
+          "documents": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "documentType": {
+                      "anyOf": [
+                        {
+                          "const": "signed_contract"
+                        },
+                        {
+                          "const": "delivery_document"
+                        },
+                        {
+                          "const": "return_document"
+                        },
+                        {
+                          "const": "other"
+                        }
+                      ]
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "fileName": {
+                      "type": "string"
+                    },
+                    "path": {
+                      "type": "string"
+                    },
+                    "thumbnailPath": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "size": {
+                      "type": "number"
+                    },
+                    "mimeType": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "anyOf": [
+                        {
+                          "const": "image"
+                        },
+                        {
+                          "const": "pdf"
+                        }
+                      ]
+                    },
+                    "uploadedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "documentType",
+                    "id",
+                    "fileName",
+                    "path",
+                    "size",
+                    "mimeType",
+                    "kind",
+                    "uploadedAt"
+                  ]
+                }
+              }
+            ]
           },
           "mileageAlertDismissed": {
             "anyOf": [
@@ -823,6 +910,30 @@
           "dataUrl": {
             "type": "string"
           },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "thumbnailPath": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "const": "image"
+              },
+              {
+                "const": "pdf"
+              }
+            ]
+          },
           "notes": {
             "type": "string"
           }
@@ -992,6 +1103,62 @@
                     "purchaseDate",
                     "notes",
                     "photos"
+                  ]
+                }
+              }
+            ]
+          },
+          "attachments": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "fileName": {
+                      "type": "string"
+                    },
+                    "path": {
+                      "type": "string"
+                    },
+                    "thumbnailPath": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "size": {
+                      "type": "number"
+                    },
+                    "mimeType": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "anyOf": [
+                        {
+                          "const": "image"
+                        },
+                        {
+                          "const": "pdf"
+                        }
+                      ]
+                    },
+                    "uploadedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "fileName",
+                    "path",
+                    "size",
+                    "mimeType",
+                    "kind",
+                    "uploadedAt"
                   ]
                 }
               }

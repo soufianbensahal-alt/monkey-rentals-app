@@ -25,7 +25,7 @@ Deno.test('dispatcher sends once, respects cancellation and never crosses accoun
     let data:unknown=[]
     if(url.pathname.endsWith('/notification_subscriptions'))data=[device]
     else if(url.pathname.endsWith('/notification_session_active')){assert(body.owner===owner);data=true}
-    else if(url.pathname.endsWith('/fleet_state')){assert(url.searchParams.get('user_id')===`eq.${owner}`);reads++;data=[{state:cancelled&&reads%2===0?{...state,events:[]}:state}]}
+    else if(url.pathname.endsWith('/fleet_state')){assert(url.searchParams.get('user_id')===`eq.${owner}`);assert(url.searchParams.get('select')==='events:state->events,notifications:state->adminSettings->notifications');reads++;const projected=cancelled&&reads%2===0?{...state,events:[]}:state;data=[{events:projected.events,notifications:projected.adminSettings.notifications}]}
     else if(url.pathname.endsWith('/notification_claim')){assert(body.p_device==='d1');data=!claims.has(body.p_key);claims.add(body.p_key)}
     else if(url.pathname.endsWith('/notification_deliveries'))statuses.push(body.status)
     return Response.json(data)

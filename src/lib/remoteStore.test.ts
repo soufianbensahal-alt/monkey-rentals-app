@@ -226,3 +226,20 @@ it('combina cambios remotos y usa una actualización condicional al guardar',asy
   expect(fetchMock.mock.calls[1][1].method).toBe('PATCH')
  }finally{vi.unstubAllGlobals();vi.unstubAllEnvs()}
 })
+
+it('guarda con una sola petición y sin devolver el estado completo cuando conoce la versión remota',async()=>{
+ vi.resetModules();vi.stubEnv('VITE_SUPABASE_URL','https://supabase.test');vi.stubEnv('VITE_SUPABASE_ANON_KEY','anon-key')
+ localStorage.clear();sessionStorage.clear();vi.useFakeTimers();vi.setSystemTime(new Date('2026-10-03T12:00:00Z'))
+ const changed={...emptyState,events:[{id:'local',title:'Pago',date:'2026-10-04',type:'pago' as const}]}
+ const fetchMock=vi.fn().mockResolvedValue({ok:true,status:200,json:async()=>[{updated_at:'2026-10-03T12:00:00.000Z',user_id:'owner'}]})
+ vi.stubGlobal('fetch',fetchMock)
+ try {
+  const {saveRemoteChanges}=await import('./remoteStore')
+  const result=await saveRemoteChanges(changed,emptyState,{accessToken:'test',userId:'owner'},'2026-10-03T11:59:00.000Z')
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+  expect(fetchMock.mock.calls[0][0]).toContain('select=updated_at,user_id')
+  expect(fetchMock.mock.calls[0][0]).not.toContain('select=state')
+  expect(fetchMock.mock.calls[0][1]).toMatchObject({method:'PATCH'})
+  expect(result.state).toEqual(changed)
+ }finally{vi.unstubAllGlobals();vi.unstubAllEnvs();vi.useRealTimers()}
+})

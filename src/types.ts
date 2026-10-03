@@ -25,6 +25,8 @@ export interface Vehicle {
   lastKmUpdate?: string
   status: VehicleStatus
   image?: string
+  imagePath?: string
+  imageThumbnailPath?: string
   notes: string
 }
 
@@ -113,6 +115,9 @@ export interface ClientDocument {
   size: number
   uploadedAt: string
   dataUrl: string
+  path?: string
+  thumbnailPath?: string
+  kind?: PrivateFileKind
   notes: string
 }
 

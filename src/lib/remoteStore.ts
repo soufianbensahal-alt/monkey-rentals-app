@@ -1,4 +1,5 @@
 import type { FleetState } from '../types'
+import { trackedFetch } from './egressDiagnostics'
 
 export interface RemoteSession {
   accessToken: string
@@ -138,7 +139,7 @@ async function performRefresh(session:RemoteSession):Promise<RemoteSession|null>
   const latest=readRemoteSession()
   if(latest && getRemoteOwnerId(latest)===getRemoteOwnerId(session))session=latest
   if (!session.refreshToken) return null
-  const response = await fetch(`${config.url}/auth/v1/token?grant_type=refresh_token`, {
+  const response = await trackedFetch(`${config.url}/auth/v1/token?grant_type=refresh_token`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ refresh_token: session.refreshToken }),
@@ -155,7 +156,7 @@ async function performRefresh(session:RemoteSession):Promise<RemoteSession|null>
 }
 
 export async function signOutRemote(session: RemoteSession, scope: RemoteSignOutScope = 'local'): Promise<void> {
-  const response = await fetch(`${config.url}/auth/v1/logout?scope=${scope}`, {
+  const response = await trackedFetch(`${config.url}/auth/v1/logout?scope=${scope}`, {
     method: 'POST',
     headers: headers(session),
   })
@@ -167,7 +168,7 @@ export async function signOutRemote(session: RemoteSession, scope: RemoteSignOut
 async function authedFetch(url: string, session: RemoteSession, init: RequestInit = {}, extraHeaders: Record<string, string> = {}) {
   const latest=readRemoteSession()
   const currentSession = latest && getRemoteOwnerId(latest)===getRemoteOwnerId(session) ? latest : session
-  const request = (nextSession: RemoteSession) => fetch(url, { ...init, headers: headers(nextSession, extraHeaders) })
+  const request = (nextSession: RemoteSession) => trackedFetch(url, { ...init, headers: headers(nextSession, extraHeaders) })
   const response = await request(currentSession)
   if (response.status !== 401) return response
   const refreshedSession = await refreshRemoteSession(currentSession)
@@ -175,7 +176,7 @@ async function authedFetch(url: string, session: RemoteSession, init: RequestIni
 }
 
 export async function signInRemote(email: string, password: string): Promise<RemoteSession> {
-  const response = await fetch(`${config.url}/auth/v1/token?grant_type=password`, {
+  const response = await trackedFetch(`${config.url}/auth/v1/token?grant_type=password`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ email, password }),
@@ -234,17 +235,26 @@ export async function privateTable(table:string,query:string,init:RequestInit={}
   return response
 }
 
-export async function saveRemoteChanges(state:FleetState,base:FleetState,session:RemoteSession):Promise<RemoteRow> {
+async function patchRemoteState(state:FleetState,session:RemoteSession,previousUpdatedAt:string):Promise<RemoteRow|null> {
+  const updatedAt=new Date(Math.max(Date.now(),Date.parse(previousUpdatedAt)+1)).toISOString()
+  const response=await authedFetch(restUrl(`?${ownerQuery(session)}&updated_at=eq.${encodeURIComponent(previousUpdatedAt)}&select=updated_at,user_id`),session,{method:'PATCH',body:JSON.stringify({state,updated_at:updatedAt})},{Prefer:'return=representation'})
+  if(!response.ok)throw new Error('No se han podido sincronizar los cambios. Se conservan en la caché local.')
+  const rows=await response.json() as RemoteMeta[]
+  return rows[0]?{state,updated_at:rows[0].updated_at,user_id:rows[0].user_id}:null
+}
+
+export async function saveRemoteChanges(state:FleetState,base:FleetState,session:RemoteSession,expectedUpdatedAt=''):Promise<RemoteRow> {
   const {mergeFleetState}=await import('./stateMerge')
+  if(expectedUpdatedAt){
+    const saved=await patchRemoteState(state,session,expectedUpdatedAt)
+    if(saved)return saved
+  }
   for(let attempt=0;attempt<3;attempt++){
     const remote=await fetchRemoteState(session)
     if(!remote){return {state,updated_at:await saveRemoteState(state,session)}}
     const merged=mergeFleetState(base,state,remote.state)
-    const updatedAt=new Date(Math.max(Date.now(),Date.parse(remote.updated_at)+1)).toISOString()
-    const response=await authedFetch(restUrl(`?${ownerQuery(session)}&updated_at=eq.${encodeURIComponent(remote.updated_at)}&select=state,updated_at,user_id`),session,{method:'PATCH',body:JSON.stringify({state:merged,updated_at:updatedAt})},{Prefer:'return=representation'})
-    if(!response.ok)throw new Error('No se han podido sincronizar los cambios. Se conservan en la caché local.')
-    const rows=await response.json() as RemoteRow[]
-    if(rows[0])return rows[0]
+    const saved=await patchRemoteState(merged,session,remote.updated_at)
+    if(saved)return saved
   }
   throw new Error('Hay cambios simultáneos en otro dispositivo. Intenta sincronizar de nuevo.')
 }

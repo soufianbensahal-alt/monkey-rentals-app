@@ -1,4 +1,5 @@
-import { getRemoteOwnerId, readRemoteSession, privateStorage, storageSignedUrl } from './remoteStore'
+import { getRemoteOwnerId, readRemoteSession, privateStorage } from './remoteStore'
+import { cachedSignedUrl, invalidateSignedUrls } from './signedUrls'
 import type { MaterialPhoto } from '../types'
 const bucket='maintenance-materials'
 const maxBytes=1500000
@@ -35,17 +36,13 @@ export async function uploadMaterialPhoto(file:File,vehicleId:string,maintenance
   try {await privateStorage(`object/${bucket}/${thumbnailPath}`,{method:'POST',body:thumbnail})}catch(error){await privateStorage(`object/${bucket}`,{method:'DELETE',body:JSON.stringify({prefixes:[path]})}).catch(()=>{});throw error}
   return {id,path,thumbnailPath,size:full.size,mimeType:full.type}
 }
-const signedCache=new Map<string,{url:string;expires:number}>()
 export async function materialPhotoUrl(path:string) {
   const owner=getRemoteOwnerId(readRemoteSession())
   if(!owner||path.split('/')[0]!==owner)throw new Error('Esta fotografía no pertenece a la cuenta actual.')
-  const cached=signedCache.get(path);if(cached&&cached.expires>Date.now())return cached.url
-  const response=await privateStorage(`object/sign/${bucket}/${path}`,{method:'POST',body:JSON.stringify({expiresIn:300})})
-  const data=await response.json();const url=storageSignedUrl(data.signedURL)
-  signedCache.set(path,{url,expires:Date.now()+240000});return url
+  return cachedSignedUrl(bucket,path)
 }
 export async function discardStagedPhotos(photos:MaterialPhoto[]) {
   const owner=getRemoteOwnerId(readRemoteSession())
   const prefixes=photos.flatMap(p=>[p.path,p.thumbnailPath]).filter(path=>owner&&path.split('/')[0]===owner)
-  if(prefixes.length)await privateStorage(`object/${bucket}`,{method:'DELETE',body:JSON.stringify({prefixes})})
+  if(prefixes.length){await privateStorage(`object/${bucket}`,{method:'DELETE',body:JSON.stringify({prefixes})});invalidateSignedUrls(bucket,prefixes)}
 }

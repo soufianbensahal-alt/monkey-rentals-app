@@ -1,6 +1,7 @@
-import { getRemoteOwnerId, privateStorage, privateTable, readRemoteSession, storageSignedUrl } from './remoteStore'
+import { getRemoteOwnerId, privateStorage, privateTable, readRemoteSession } from './remoteStore'
 import { uid } from './format'
-import type { MaintenanceFile, PrivateFile, RentalDocument, RentalDocumentType } from '../types'
+import { cachedSignedUrl, invalidateSignedUrls } from './signedUrls'
+import type { ClientDocument, ClientDocumentType, MaintenanceFile, PrivateFile, RentalDocument, RentalDocumentType } from '../types'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 const IMAGE_TYPES = new Set(['image/jpeg','image/png','image/webp'])
@@ -8,6 +9,10 @@ const ALLOWED_TYPES = new Set([...IMAGE_TYPES,'application/pdf'])
 type Target =
   | { type:'maintenance'; recordId:string; vehicleId:string }
   | { type:'rental'; recordId:string; vehicleId:string; customerId:string; documentType:RentalDocumentType }
+  | { type:'client'; recordId:string; customerId:string; documentType:ClientDocumentType; notes:string }
+
+const bucketFor=(target:Target['type']|'maintenance'|'rental'|'client')=>target==='maintenance'?'maintenance-files':target==='rental'?'rental-documents':'client-documents'
+const tableFor=(target:Target['type']|'maintenance'|'rental'|'client')=>target==='maintenance'?'maintenance_files':target==='rental'?'rental_documents':'client_documents'
 
 function ownerId() {
   const owner=getRemoteOwnerId(readRemoteSession())
@@ -29,43 +34,46 @@ async function imageBlob(file:File,max:number,quality:number) {
   return new Promise<Blob>((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('No se ha podido procesar la imagen.')),'image/webp',quality))
 }
 
-export async function uploadPrivateFile(file:File,target:Target):Promise<MaintenanceFile|RentalDocument> {
+export async function uploadPrivateFile(file:File,target:Target):Promise<MaintenanceFile|RentalDocument|ClientDocument> {
   validatePrivateFile(file)
-  const owner=ownerId(), id=uid('file'), image=IMAGE_TYPES.has(file.type), bucket=target.type==='maintenance'?'maintenance-files':'rental-documents'
+  const owner=ownerId(), id=target.type==='client'?target.recordId:uid('file'), image=IMAGE_TYPES.has(file.type), bucket=bucketFor(target.type)
   const extension=image?'webp':'pdf'
   const path=`${owner}/${target.recordId}/${id}-${safeName(file.name.replace(/\.[^.]+$/,''))}.${extension}`
   const thumbnailPath=image?`${owner}/${target.recordId}/${id}-thumb.webp`:undefined
-  const body=image?await imageBlob(file,2200,.86):file
+  const body=image?await imageBlob(file,1600,.78):file
   if(body.size>MAX_FILE_SIZE)throw new Error('La imagen sigue superando 10 MB después de optimizarla.')
   await privateStorage(`object/${bucket}/${path}`,{method:'POST',body})
   try {
-    if(thumbnailPath)await privateStorage(`object/${bucket}/${thumbnailPath}`,{method:'POST',body:await imageBlob(file,420,.78)})
+    if(thumbnailPath)await privateStorage(`object/${bucket}/${thumbnailPath}`,{method:'POST',body:await imageBlob(file,360,.72)})
     const common:PrivateFile={id,fileName:file.name,path,thumbnailPath,size:body.size,mimeType:image?'image/webp':'application/pdf',kind:image?'image':'pdf',uploadedAt:new Date().toISOString()}
     const row=target.type==='maintenance'
       ? {id,user_id:owner,maintenance_id:target.recordId,vehicle_id:target.vehicleId,file_name:common.fileName,storage_path:path,thumbnail_path:thumbnailPath||null,mime_type:common.mimeType,file_size:common.size,file_type:common.kind}
-      : {id,user_id:owner,rental_id:target.recordId,vehicle_id:target.vehicleId,customer_id:target.customerId,document_type:target.documentType,file_name:common.fileName,storage_path:path,thumbnail_path:thumbnailPath||null,mime_type:common.mimeType,file_size:common.size}
-    await privateTable(target.type==='maintenance'?'maintenance_files':'rental_documents','?on_conflict=id',{method:'POST',body:JSON.stringify([row])})
-    return target.type==='maintenance'?common:{...common,documentType:target.documentType}
+      : target.type==='rental'
+        ? {id,user_id:owner,rental_id:target.recordId,vehicle_id:target.vehicleId,customer_id:target.customerId,document_type:target.documentType,file_name:common.fileName,storage_path:path,thumbnail_path:thumbnailPath||null,mime_type:common.mimeType,file_size:common.size}
+        : {id,user_id:owner,customer_id:target.customerId,document_type:target.documentType,file_name:common.fileName,storage_path:path,thumbnail_path:thumbnailPath||null,mime_type:common.mimeType,file_size:common.size,file_type:common.kind,notes:target.notes}
+    await privateTable(tableFor(target.type),'?on_conflict=id',{method:'POST',body:JSON.stringify([row])})
+    if(target.type==='maintenance')return common
+    if(target.type==='rental')return {...common,documentType:target.documentType}
+    return {...common,customerId:target.customerId,type:target.documentType,dataUrl:'',notes:target.notes}
   } catch(error) {
     await privateStorage(`object/${bucket}`,{method:'DELETE',body:JSON.stringify({prefixes:[path,...(thumbnailPath?[thumbnailPath]:[])]})}).catch(()=>{})
     throw error
   }
 }
 
-export async function privateFileUrl(file:PrivateFile,target:'maintenance'|'rental',download=false) {
-  const bucket=target==='maintenance'?'maintenance-files':'rental-documents'
-  const response=await privateStorage(`object/sign/${bucket}/${file.path}`,{method:'POST',body:JSON.stringify({expiresIn:300,download:download?file.fileName:undefined})})
-  const data=await response.json() as {signedURL:string}
-  return storageSignedUrl(data.signedURL)
+export async function privateFileUrl(file:PrivateFile,target:'maintenance'|'rental'|'client',download=false) {
+  const bucket=bucketFor(target)
+  return cachedSignedUrl(bucket,file.path,download?file.fileName:undefined)
 }
 
-export async function privateThumbnailUrl(file:PrivateFile,target:'maintenance'|'rental') {
+export async function privateThumbnailUrl(file:PrivateFile,target:'maintenance'|'rental'|'client') {
   if(!file.thumbnailPath)return ''
   return privateFileUrl({...file,path:file.thumbnailPath},target)
 }
 
-export async function deletePrivateFile(file:PrivateFile,target:'maintenance'|'rental') {
-  const bucket=target==='maintenance'?'maintenance-files':'rental-documents'
+export async function deletePrivateFile(file:PrivateFile,target:'maintenance'|'rental'|'client') {
+  const bucket=bucketFor(target)
   await privateStorage(`object/${bucket}`,{method:'DELETE',body:JSON.stringify({prefixes:[file.path,...(file.thumbnailPath?[file.thumbnailPath]:[])]})})
-  await privateTable(target==='maintenance'?'maintenance_files':'rental_documents',`?id=eq.${encodeURIComponent(file.id)}`,{method:'DELETE'})
+  invalidateSignedUrls(bucket,[file.path,...(file.thumbnailPath?[file.thumbnailPath]:[])])
+  await privateTable(tableFor(target),`?id=eq.${encodeURIComponent(file.id)}`,{method:'DELETE'})
 }

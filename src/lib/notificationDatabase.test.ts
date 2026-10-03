@@ -27,6 +27,7 @@ beforeAll(async()=>{
     grant select,insert,delete on storage.objects to authenticated;
     create function storage.foldername(text) returns text[] language sql as $$select string_to_array($1,'/')$$;`)
   await db.exec(readFileSync('supabase/migrations/20260928195715_materials_debts_notification_reliability.sql','utf8'))
+  await db.exec(readFileSync('supabase/migrations/20261003090732_reduce_egress_private_media.sql','utf8'))
   const state={events:[{id:'event-a',revision:'rev1',type:'itv',status:'active'}],adminSettings:{notifications:{enabled:true,categories:['itv']}}}
   await db.query('insert into fleet_state(id,user_id,state) values ($1,$2,$3),($4,$5,$6)', ['a',a,state,'b',b,{events:[]}])
   await db.query('select notification_register_device($1,$2,$3,$4)',[a,sessionA,'https://fcm.googleapis.com/fcm/send/test',{}])
@@ -78,6 +79,16 @@ describe('aislamiento y registro atómico de notificaciones',()=>{
     await expect(db.query('insert into storage.objects(bucket_id,name) values ($1,$2)',['maintenance-materials',`${b}/v/m/p/image.webp`])).rejects.toThrow(/row-level security/)
     await db.exec(`select set_config('request.jwt.claim.sub','${b}',false)`)
     expect((await db.query('select * from storage.objects')).rows).toHaveLength(0)
+    await db.exec('reset role')
+  })
+  it('mantiene RLS por usuario en imágenes de vehículos y documentos de clientes',async()=>{
+    await db.exec(`set role authenticated;select set_config('request.jwt.claim.sub','${a}',false);`)
+    await db.query('insert into vehicle_images(id,user_id,vehicle_id,storage_path,thumbnail_path,mime_type,file_size) values ($1,$2,$3,$4,$5,$6,$7)',[crypto.randomUUID(),a,'v1',`${a}/v1/full.webp`,`${a}/v1/thumb.webp`,'image/webp',1000])
+    await db.query('insert into client_documents(id,user_id,customer_id,document_type,file_name,storage_path,mime_type,file_size,file_type) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)',['doc-a',a,'c1','DNI / NIE','dni.pdf',`${a}/c1/dni.pdf`,'application/pdf',1000,'pdf'])
+    await expect(db.query('insert into client_documents(id,user_id,customer_id,document_type,file_name,storage_path,mime_type,file_size,file_type) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)',['doc-b',b,'c2','Otro','otro.pdf',`${b}/c2/otro.pdf`,'application/pdf',1000,'pdf'])).rejects.toThrow(/row-level security/)
+    await db.exec(`select set_config('request.jwt.claim.sub','${b}',false)`)
+    expect((await db.query('select * from vehicle_images')).rows).toHaveLength(0)
+    expect((await db.query('select * from client_documents')).rows).toHaveLength(0)
     await db.exec('reset role')
   })
   it('protege principal e historial de deuda en el servidor, también con clientes antiguos',async()=>{
