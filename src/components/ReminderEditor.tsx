@@ -71,7 +71,7 @@ export function ReminderEditor({event,date,onClose}:{event?:CalendarEvent;date:s
     {relationship('ITV / Documento','documentId',state.documents.map(d=>({id:d.id,label:`${d.type} · ${d.expiryDate}`})))}
     {relationship('Deuda','debtId',(state.debts||[]).map(d=>({id:d.id,label:`${d.customerName} · ${d.reason}`})))}
     <label className="sm:col-span-2"><span className="label">Notas</span><textarea className="field" maxLength={4000} value={draft.notes||''} onChange={e=>set({notes:e.target.value})}/></label>
-    <p className="text-xs text-stone-500 sm:col-span-2">La alerta aparecerá en la app. Para recibir avisos en el dispositivo, activa las notificaciones en Configuración. Si editas una alerta repetida, se modifica toda la serie.</p>
+    <p className="text-xs text-stone-500 sm:col-span-2">La alerta aparecerá en la app (Calendario, Alertas y el panel de notificaciones). Si editas una alerta repetida, se modifica toda la serie.</p>
     <div className="flex flex-wrap justify-end gap-3 sm:col-span-2">{event&&<ConfirmButton title="Eliminar alerta" message="¿Eliminar esta alerta y cancelar todos sus próximos avisos?" onConfirm={()=>{remove('events',event.id);onClose()}}/>}<button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button><button className="btn-primary" disabled={syncStatus==='loading'}>Guardar alerta</button></div>
   </form></Modal>
 }

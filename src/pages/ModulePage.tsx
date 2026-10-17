@@ -1,6 +1,5 @@
 import { MaintenanceEditor } from '../components/MaintenanceEditor'
 import { UpcomingReminders } from '../components/UpcomingReminders'
-import { NotificationSettingsPanel } from '../components/NotificationSettings'
 import { BackupSettings, BackupReminder } from '../components/BackupSettings'
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
@@ -15,7 +14,7 @@ import ReportsPage from './ReportsPage'
 import type { MaintenanceRecord } from '../types'
 
 type ModuleType='calendar'|'maintenance'|'alerts'|'reports'|'settings'
-export default function ModulePage({type}:{type:ModuleType}){if(type==='calendar')return <Calendar/>;if(type==='maintenance')return <Maintenance/>;if(type==='alerts')return <Alerts/>;if(type==='reports')return <ReportsPage/>;return <><SettingsPage/><NotificationSettingsPanel/><BackupSettings/><ThemeSelector/></>}
+export default function ModulePage({type}:{type:ModuleType}){if(type==='calendar')return <Calendar/>;if(type==='maintenance')return <Maintenance/>;if(type==='alerts')return <Alerts/>;if(type==='reports')return <ReportsPage/>;return <><SettingsPage/><BackupSettings/><ThemeSelector/></>}
 
 function Calendar(){const {state}=useFleet();const sorted=[...state.events].sort((a,b)=>a.date.localeCompare(b.date));const grouped=sorted.reduce<Record<string,typeof sorted>>((acc,e)=>{(acc[e.date]??=[]).push(e);return acc},{});return <div className="fade-up"><PageHeader eyebrow="Planificación" title="Calendario" description="Entregas, devoluciones, ITV y taller en una única agenda."/><section className="card p-5"><h2 className="font-display text-xl font-bold">Próximos eventos</h2>{sorted.length?<div className="mt-5 space-y-5">{Object.entries(grouped).map(([day,events])=><div key={day} className="grid gap-3 sm:grid-cols-[100px_1fr]"><div><p className="font-bold text-brand-700">{shortDate(day)}</p><p className="text-xs text-stone-500">{events.length} eventos</p></div><div className="space-y-2">{events.map(e=><div className="rounded-xl border-l-4 border-brand-500 bg-brand-50 p-3" key={e.id}><p className="font-semibold">{e.title}</p><p className="mt-1 text-xs capitalize text-stone-500">{e.type}</p></div>)}</div></div>)}</div>:<EmptyState title="No hay eventos programados." description="Los próximos alquileres, ITV y mantenimientos aparecerán aquí."/>}</section></div>}
 

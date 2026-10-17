@@ -1,6 +1,5 @@
 import { CACHED_IMAGE_OMITTED, mergeFleetState } from '../lib/stateMerge'
 import { validateDebtPayment } from '../lib/debts'
-import { clearDeviceOnLogout, reconcileDevice } from '../lib/pushNotifications'
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Monitor, Moon, ShieldCheck, Sun } from 'lucide-react'
 import { parseBackup, restoreBackup, type RestoreMode } from '../lib/backups'
@@ -424,12 +423,15 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   }, [session,persistChanges])
 
   useEffect(()=>{
-    const owner=getRemoteOwnerId(session)
-    if(!owner)return
-    const reconcile=()=>{if(!document.hidden)void reconcileDevice(owner).catch(()=>{})}
-    reconcile();window.addEventListener('focus',reconcile)
-    return()=>window.removeEventListener('focus',reconcile)
-  },[session])
+    // Push notifications were removed: drop subscriptions left by the old service worker.
+    if(!('serviceWorker' in navigator))return
+    void navigator.serviceWorker.getRegistrations().then(async registrations=>{
+      for(const registration of registrations){
+        await (await registration.pushManager?.getSubscription())?.unsubscribe()
+        await registration.unregister()
+      }
+    }).catch(()=>{})
+  },[])
 
   const signIn = useCallback(async (email:string,password:string,remember:boolean) => {
     setSyncStatus('loading')
@@ -459,7 +461,6 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const clearRemoteLogin = useCallback((message = '') => {
-    void clearDeviceOnLogout().catch(()=>{ /* Browser may be offline; backend also checks the auth session. */ })
     saveRemoteSession(null)
     initialCache.current = structuredClone(emptyState)
     remoteUpdatedAt.current = ''

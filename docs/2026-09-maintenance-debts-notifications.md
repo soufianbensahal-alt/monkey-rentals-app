@@ -14,6 +14,8 @@ Bucket privado `maintenance-materials`, ruta propietario/vehículo/mantenimiento
 
 ## Notificaciones
 
+> Eliminadas el 17/10/2026: ya no hay avisos push al móvil, solo avisos internos dentro de la app. Ver `supabase/NOTIFICATIONS.md`. Se conserva el texto original como historial.
+
 Cron y Edge Functions ya existentes ejecutan el envío sin la página abierta. Los vencimientos del calendario permiten configurar un aviso móvil explícito. La cola utiliza `notification_deliveries` (pendiente, en curso, enviado, fallido, cancelado); `notification_logs` conserva intentos y errores. Máximo tres intentos para fallos transitorios, con dos minutos de separación; las reclamaciones abandonadas pueden recuperarse tras cinco minutos. Un identificador estable y un registro local del service worker evitan repetir los reintentos mostrados.
 
 No se borra el evento al enviar. Los eventos únicos pasados y todavía activos se muestran como pendientes de revisar. El dispositivo se reconcilia al abrir la app; una suscripción caducada se puede renovar si se conserva el consentimiento y el navegador lo permite. Las nuevas inscripciones no recuperan avisos anteriores a su fecha de alta. El historial diagnóstico se ve en Configuración → Notificaciones. «Enviado» significa aceptado por el proveedor push, no confirmación de visualización en el teléfono.

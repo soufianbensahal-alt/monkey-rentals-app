@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "vitest run",
-    "notifications:prepare": "node scripts/generate-backup-schema.mjs && node scripts/sync-notification-shared.mjs"
+    "backup:schema": "node scripts/generate-backup-schema.mjs"
   },
   "dependencies": {
     "@js-temporal/polyfill": "0.5.1",
