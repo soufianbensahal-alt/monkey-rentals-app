@@ -2,7 +2,7 @@ import type { CalendarEvent } from '../types'
 import { uid } from '../lib/format'
 import { ReminderEditor } from '../components/ReminderEditor'
 import { UpcomingReminders } from '../components/UpcomingReminders'
-import { occurrences, offsetLabel, reminderDetails, reminderCategories } from '../lib/reminders'
+import { reminderDetails, reminderCategories } from '../lib/reminders'
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
@@ -77,10 +77,7 @@ export default function CalendarPage() {
     ...state.events.flatMap(event => {
       const type:EventType=event.type==='entrega'||event.type==='devolución'?'alquiler':event.type
       const common={title:event.title,type,reminderId:event.id,status:event.status==='completed'?'Completada':event.status==='cancelled'?'Cancelada':'Activa',priority:event.priority}
-      if(!event.reminders?.length || !event.time || event.status==='completed' || event.status==='cancelled') return [{...common,id:`event-${event.id}`,date:event.date,time:event.time,detail:event.description||reminderCategories[event.type]}]
-      const rangeStart=new Date(cursor.getFullYear(),cursor.getMonth(),-6)
-      const rangeEnd=new Date(cursor.getFullYear(),cursor.getMonth()+1,15)
-      return occurrences(event,iso(rangeStart),iso(rangeEnd)).map(o=>({...common,id:o.key,date:o.date,time:o.time,detail:[reminderDetails(event,state),event.reminders!.map(offsetLabel).join(' / '),event.timezone].filter(Boolean).join(' · ')}))
+      return [{...common,id:`event-${event.id}`,date:event.date,time:event.time,detail:reminderDetails(event,state)||reminderCategories[event.type]}]
     }),
     ...state.payments.map(payment => {
       const rental = state.rentals.find(item => item.id === payment.rentalId)
@@ -116,7 +113,7 @@ export default function CalendarPage() {
     ...state.documents.map(item => ({ id: `document-${item.id}`, date: item.expiryDate, title: `Vence ${item.type}`, detail: vehicleLabel(state.vehicles.find(vehicle => vehicle.id === item.vehicleId)), type: item.type.toLowerCase().includes('itv') ? 'itv' as const : 'documento' as const })),
     ...state.taxes.map(item => ({ id: `tax-${item.id}`, date: item.dueDate, title: item.concept, detail: `${vehicleLabel(state.vehicles.find(vehicle => vehicle.id === item.vehicleId))} · ${euro.format(item.amount)}`, type: 'impuesto' as const })),
     ...state.fines.map(item => ({ id: `fine-${item.id}`, date: item.dueDate || item.infractionDate, title: item.concept, detail: `${vehicleLabel(state.vehicles.find(vehicle => vehicle.id === item.vehicleId))} · ${euro.format(item.amount)}`, type: 'multa' as const })),
-  ], [state,cursor])
+  ], [state])
 
   const year = cursor.getFullYear()
   const month = cursor.getMonth()
