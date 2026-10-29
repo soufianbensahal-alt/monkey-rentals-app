@@ -4,7 +4,7 @@ import { privateFileUrl, privateThumbnailUrl } from '../lib/privateFiles'
 import type { PrivateFile } from '../types'
 import { Modal } from './ui'
 
-export function PrivateFileView({file,target,onRemove}:{file:PrivateFile;target:'maintenance'|'rental';onRemove?:()=>void}) {
+export function PrivateFileView({file,target,onRemove}:{file:PrivateFile;target:'maintenance'|'rental'|'expense';onRemove?:()=>void}) {
   const [thumbnail,setThumbnail]=useState(''),[full,setFull]=useState(''),[error,setError]=useState(''),[loading,setLoading]=useState(false)
   const card=useRef<HTMLDivElement>(null)
   useEffect(()=>{let active=true,observer:IntersectionObserver|undefined;const load=()=>{if(file.thumbnailPath)void privateThumbnailUrl(file,target).then(url=>active&&setThumbnail(url)).catch(()=>active&&setError('Miniatura no disponible'))};if(!file.thumbnailPath)return()=>{active=false};if(typeof IntersectionObserver==='undefined')load();else{observer=new IntersectionObserver(items=>{if(items.some(item=>item.isIntersecting)){observer?.disconnect();load()}},{rootMargin:'160px'});if(card.current)observer.observe(card.current)}return()=>{active=false;observer?.disconnect()}},[file,target])

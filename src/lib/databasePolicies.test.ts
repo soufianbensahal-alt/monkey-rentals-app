@@ -28,6 +28,7 @@ beforeAll(async()=>{
   await db.exec(readFileSync('supabase/migrations/20260928195715_materials_debts_notification_reliability.sql','utf8'))
   await db.exec(readFileSync('supabase/migrations/20261003090732_reduce_egress_private_media.sql','utf8'))
   await db.exec(readFileSync('supabase/migrations/20261017120000_remove_push_notifications.sql','utf8'))
+  await db.exec(readFileSync('supabase/migrations/20261029120000_expenses.sql','utf8'))
   const state={events:[{id:'event-a',revision:'rev1',type:'itv',status:'active'}],adminSettings:{notifications:{enabled:true,categories:['itv']}}}
   await db.query('insert into fleet_state(id,user_id,state) values ($1,$2,$3),($4,$5,$6)', ['a',a,state,'b',b,{events:[]}])
 },20000)
@@ -36,6 +37,21 @@ describe('políticas de base de datos',()=>{
   it('elimina las tablas y funciones de notificaciones push',async()=>{
     const {rows}=await db.query<{name:string}>("select table_name as name from information_schema.tables where table_schema='public' and table_name like 'notification%' union all select routine_name from information_schema.routines where routine_schema='public' and routine_name like 'notification%'")
     expect(rows).toEqual([])
+  })
+  it('aísla los gastos por usuario y aplica las reglas de categoría',async()=>{
+    const insert=(owner:string,id:string,vehicle:string|null=null)=>db.query("insert into expenses(id,user_id,date,amount,category,vehicle_id) values ($1,$2,'2026-10-29',12.5,'combustible',$3)",[id,owner,vehicle])
+    await db.exec(`set role authenticated;select set_config('request.jwt.claim.sub','${a}',false);`)
+    await insert(a,'e1','v1')
+    await insert(a,'e2')
+    await expect(insert(b,'e3')).rejects.toThrow(/row-level security/)
+    await expect(db.query("insert into expenses(id,user_id,date,amount,category,travel_type) values ('e4',$1,'2026-10-29',1,'material','taxi')",[a])).rejects.toThrow(/check/)
+    await expect(db.query("insert into expenses(id,user_id,date,amount,category,liters) values ('e5',$1,'2026-10-29',1,'otros',10)",[a])).rejects.toThrow(/check/)
+    await expect(db.query("insert into expenses(id,user_id,date,amount,category) values ('e6',$1,'2026-10-29',1,'inventada')",[a])).rejects.toThrow(/enum/)
+    expect((await db.query<{id:string;vehicle_id:string|null}>('select id,vehicle_id from expenses order by id')).rows).toEqual([{id:'e1',vehicle_id:'v1'},{id:'e2',vehicle_id:null}])
+    await db.exec(`select set_config('request.jwt.claim.sub','${b}',false)`)
+    expect((await db.query('select * from expenses')).rows).toHaveLength(0)
+    expect((await db.query("delete from expenses where id='e1' returning id")).rows).toHaveLength(0)
+    await db.exec('reset role')
   })
   it('aísla las fotografías privadas por propietario',async()=>{
     await db.exec(`set role authenticated;select set_config('request.jwt.claim.sub','${a}',false);`)

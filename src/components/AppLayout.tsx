@@ -15,6 +15,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  ReceiptText,
   MoreHorizontal,
   Search,
   Settings,
@@ -48,6 +49,7 @@ const primaryNav: NavItem[] = [
 const secondaryNav: NavItem[] = [
   { to: '/app/calendario', label: 'Calendario', icon: CalendarDays },
   { to: '/app/mantenimiento', label: 'Mantenimiento', icon: Wrench },
+  { to: '/app/gastos', label: 'Gastos', icon: ReceiptText },
   { to: '/app/documentacion', label: 'ITV / Documentación', icon: FileCheck2 },
   { to: '/app/alertas', label: 'Alertas', icon: CircleAlert },
   { to: '/app/informes', label: 'Informes', icon: ChartNoAxesCombined },
@@ -60,6 +62,7 @@ const desktopNav: NavItem[] = [
   { to: '/app/alquileres', label: 'Alquileres', icon: KeyRound },
   { to: '/app/calendario', label: 'Calendario', icon: CalendarDays },
   { to: '/app/mantenimiento', label: 'Mantenimiento', icon: Wrench },
+  { to: '/app/gastos', label: 'Gastos', icon: ReceiptText },
   { to: '/app/documentacion', label: 'ITV / Documentación', icon: FileCheck2 },
   { to: '/app/pagos', label: 'Pagos', icon: CreditCard },
   { to: '/app/clientes', label: 'Clientes', icon: Users },
