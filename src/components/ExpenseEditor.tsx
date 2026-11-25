@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useFleet } from '../store/FleetContext'
 import { expenseCategories, procedureTypes, saveExpense, travelTypes, type Expense, type ExpenseCategory, type ProcedureType, type TravelType } from '../lib/expenses'
 import { validatePrivateFile } from '../lib/privateFiles'
-import { vehicleLabel } from '../lib/vehicles'
+import { vehicleLabel, vehicleOptionLabel, vehicleOptions } from '../lib/vehicles'
 import { PrivateFileView } from './PrivateFileView'
 import { Modal } from './ui'
 
@@ -22,7 +22,10 @@ export function ExpenseEditor({ expense, onClose }: { expense: Expense; onClose:
     if (linked && !draft.vehicleId) { setError('Selecciona el vehículo o desactiva «Vincular a vehículo».'); return }
     setBusy(true); setError('')
     try {
-      await saveExpense({ ...draft, vehicleId: linked ? draft.vehicleId : undefined }, { file, removeAttachment })
+      const vehicleId = linked ? draft.vehicleId : undefined
+      // Keep the deleted-vehicle snapshot only while the expense stays on that vehicle.
+      const vehicleSnapshot = expense.vehicleSnapshot ? (vehicleId === expense.vehicleId ? expense.vehicleSnapshot : null) : undefined
+      await saveExpense({ ...draft, vehicleId, vehicleSnapshot }, { file, removeAttachment })
       onClose()
     } catch (problem) {
       setError(problem instanceof Error ? problem.message : 'No se ha podido guardar el gasto.')
@@ -49,7 +52,7 @@ export function ExpenseEditor({ expense, onClose }: { expense: Expense; onClose:
       <label className="sm:col-span-2"><span className="label">Proveedor (opcional)</span><input className="field" maxLength={200} value={draft.supplier || ''} onChange={e => set({ supplier: e.target.value })}/></label>
       <div className="space-y-3 rounded-xl border border-orange-100 p-4 sm:col-span-2">
         <label className="flex items-center gap-3"><input type="checkbox" checked={linked} onChange={e => setLinked(e.target.checked)}/><span className="font-semibold">Vincular a vehículo</span></label>
-        {linked ? <label className="block"><span className="label">Vehículo *</span><select className="field" value={draft.vehicleId || ''} onChange={e => set({ vehicleId: e.target.value || undefined })}><option value="">Selecciona un vehículo</option>{state.vehicles.map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicle.plate} · {vehicleLabel(vehicle)}</option>)}</select></label>
+        {linked ? <label className="block"><span className="label">Vehículo *</span><select className="field" value={draft.vehicleId || ''} onChange={e => set({ vehicleId: e.target.value || undefined })}><option value="">Selecciona un vehículo</option>{vehicleOptions(state, expense.vehicleId).map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicle.plate} · {vehicleLabel(vehicle)}{vehicleOptionLabel(vehicle)}</option>)}{expense.vehicleId && expense.vehicleSnapshot && !state.vehicles.some(vehicle => vehicle.id === expense.vehicleId) && <option value={expense.vehicleId}>{expense.vehicleSnapshot.plate} · {expense.vehicleSnapshot.label} (eliminado)</option>}</select></label>
           : <p className="text-sm text-stone-500">Se guardará como gasto genérico de la flota.</p>}
       </div>
       <div className="sm:col-span-2"><span className="label">Ticket o factura (opcional)</span>

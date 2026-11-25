@@ -6,6 +6,7 @@ import { parseBackup, restoreBackup, type RestoreMode } from '../lib/backups'
 import { emptyState } from '../data/emptyState'
 import { fetchRemoteMeta, fetchRemoteState, getRememberRemoteSession, getRemoteOwnerId, readRemoteSession, refreshRemoteSession, remoteEnabled, saveRemoteSession, saveRemoteState, saveRemoteChanges, setRememberRemoteSession, signInRemote, signOutRemote, type RemoteSession, type RemoteStatus } from '../lib/remoteStore'
 import { saveRentalMileage } from '../lib/mileage'
+import { removeVehicleSelective } from '../lib/vehicleLifecycle'
 import { getNextPaymentDate } from '../lib/paymentReminders'
 import { migrateLegacyMedia } from '../lib/legacyMediaMigration'
 import { REMOTE_ACTIVE_WINDOW_MS, REMOTE_REFRESH_INTERVAL_MS, shouldPollRemote } from '../lib/syncPolicy'
@@ -68,10 +69,8 @@ function reducer(state: FleetState, action: Action): FleetState {
     }
   }
   if (action.type === 'remove') {
-    if (action.collection === 'vehicles') {
-      const rentalIds = state.rentals.filter(item => item.vehicleId === action.id).map(item => item.id)
-      return { ...state, vehicles:state.vehicles.filter(item=>item.id!==action.id), rentals:state.rentals.filter(item=>item.vehicleId!==action.id), payments:state.payments.filter(item=>!rentalIds.includes(item.rentalId)), maintenance:state.maintenance.filter(item=>item.vehicleId!==action.id), documents:state.documents.filter(item=>item.vehicleId!==action.id), taxes:state.taxes.filter(item=>item.vehicleId!==action.id), fines:state.fines.filter(item=>item.vehicleId!==action.id) }
-    }
+    // Selective delete: rentals, payments and fines of a rental are kept with a vehicle snapshot.
+    if (action.collection === 'vehicles') return removeVehicleSelective(state, action.id)
     if (action.collection === 'customers') {
       const rentalIds = state.rentals.filter(item => item.customerId === action.id).map(item => item.id)
       return { ...state, customers:state.customers.filter(item=>item.id!==action.id), rentals:state.rentals.filter(item=>item.customerId!==action.id), payments:state.payments.filter(item=>!rentalIds.includes(item.rentalId)), clientDocuments:state.clientDocuments.filter(item=>item.customerId!==action.id), fines:state.fines.map(item=>item.customerId===action.id?{...item,customerId:undefined}:item) }

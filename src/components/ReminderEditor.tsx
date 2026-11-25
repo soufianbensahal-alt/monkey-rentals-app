@@ -3,6 +3,7 @@ import { useFleet } from '../store/FleetContext'
 import { Modal, ConfirmButton } from './ui'
 import { defaultTimezone, reminderCategories, validateReminder } from '../lib/reminders'
 import type { CalendarEvent } from '../types'
+import { vehicleOptionLabel, vehicleOptions } from '../lib/vehicles'
 import { uid } from '../lib/format'
 
 export function ReminderEditor({event,date,onClose}:{event?:CalendarEvent;date:string;onClose:()=>void}) {
@@ -13,7 +14,9 @@ export function ReminderEditor({event,date,onClose}:{event?:CalendarEvent;date:s
   const save=(e:FormEvent)=>{
     e.preventDefault()
     // Drop scheduled notices and repetition saved by older versions of the form.
-    const next={...draft,reminders:undefined,recurrence:undefined,title:draft.title.trim(),revision:crypto.randomUUID(),createdAt:draft.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()}
+    // The deleted-vehicle snapshot only applies while the reminder keeps that vehicle.
+    const keepSnapshot=!!draft.vehicleSnapshot&&draft.vehicleId===event?.vehicleId&&!state.vehicles.some(v=>v.id===draft.vehicleId)
+    const next={...draft,...(keepSnapshot?{}:{vehicleSnapshot:undefined}),reminders:undefined,recurrence:undefined,title:draft.title.trim(),revision:crypto.randomUUID(),createdAt:draft.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()}
     const problem=validateReminder(next)
     if(problem){setError(problem);return}
     if(syncStatus==='loading'){setError('Espera a que termine la sincronización.');return}
@@ -37,7 +40,7 @@ export function ReminderEditor({event,date,onClose}:{event?:CalendarEvent;date:s
     <label><span className="label">Prioridad</span><select className="field" value={draft.priority||'media'} onChange={e=>set({priority:e.target.value as CalendarEvent['priority']})}><option value="baja">Baja</option><option value="media">Normal</option><option value="alta">Alta</option></select></label>
     <label><span className="label">Estado</span><select className="field" value={draft.status||'active'} onChange={e=>set({status:e.target.value as CalendarEvent['status']})}><option value="active">Activa</option><option value="completed">Completada</option><option value="cancelled">Cancelada</option></select></label>
     {relationship('Cliente','customerId',state.customers.map(c=>({id:c.id,label:c.name})))}
-    {relationship('Vehículo','vehicleId',state.vehicles.map(v=>({id:v.id,label:`${v.plate} · ${v.brand} ${v.model}`})))}
+    {relationship('Vehículo','vehicleId',[...vehicleOptions(state,event?.vehicleId).map(v=>({id:v.id,label:`${v.plate} · ${v.brand} ${v.model}${vehicleOptionLabel(v)}`})),...(event?.vehicleId&&event.vehicleSnapshot&&!state.vehicles.some(v=>v.id===event.vehicleId)?[{id:event.vehicleId,label:`${event.vehicleSnapshot.plate} · ${event.vehicleSnapshot.label} (eliminado)`}]:[])])}
     {relationship('Alquiler / reserva','rentalId',state.rentals.map(r=>({id:r.id,label:`${state.customers.find(c=>c.id===r.customerId)?.name||'Cliente'} · ${r.startDate} → ${r.endDate||'Sin fecha final'}`})))}
     {relationship('Pago','paymentId',state.payments.map(p=>({id:p.id,label:`${p.amount} € · ${p.dueDate} · ${state.customers.find(c=>c.id===state.rentals.find(r=>r.id===p.rentalId)?.customerId)?.name||'Cliente'}`})))}
     {relationship('Mantenimiento','maintenanceId',state.maintenance.map(m=>({id:m.id,label:`${m.type} · ${m.date}`})))}

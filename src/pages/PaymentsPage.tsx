@@ -6,7 +6,8 @@ import { useFleet } from '../store/FleetContext'
 import { date, euro, euroWithCents, uid } from '../lib/format'
 import { effectivePaymentStatus } from '../lib/payments'
 import { isFlexiblePayment, paymentKindLabel, paymentReminderLabel, paymentTypeLabels, recurrenceFromFrequency, reminderFrequencyLabels } from '../lib/paymentReminders'
-import { vehicleLabel } from '../lib/vehicles'
+import { vehicleLabel, vehiclePlate } from '../lib/vehicles'
+import { VehicleStateBadge } from '../components/VehicleLifecycle'
 import { usePagination } from '../lib/pagination'
 import { ListPagination } from '../components/ListPagination'
 import type { Payment, PaymentStatus, PaymentType, ReminderFrequency } from '../types'
@@ -34,7 +35,7 @@ export default function PaymentsPage() {
     const matchesFilter = filter === 'todos'
       || item.status === filter
       || (filter === 'flexible' && item.flexible)
-    const haystack = `${item.customer?.name} ${vehicleLabel(item.vehicle)} ${item.vehicle?.plate} ${item.payment.dueDate} ${item.status} ${paymentKindLabel(item.payment)} ${paymentReminderLabel(item.payment)}`.toLowerCase()
+    const haystack = `${item.customer?.name} ${vehicleLabel(item.vehicle, item.rental?.vehicleSnapshot)} ${vehiclePlate(item.vehicle, item.rental?.vehicleSnapshot)} ${item.payment.dueDate} ${item.status} ${paymentKindLabel(item.payment)} ${paymentReminderLabel(item.payment)}`.toLowerCase()
     return matchesFilter && haystack.includes(deferred.toLowerCase())
   }), [decorated, filter, deferred])
   const pagination=usePagination(rows,25)
@@ -118,8 +119,8 @@ export default function PaymentsPage() {
     <div className="table-shell mt-5">
       {state.payments.length ? rows.length ? <table className="data-table">
         <thead><tr><th>Cliente y vehículo</th><th>Fecha</th><th>Tipo</th><th>Estado</th><th>Recordatorio</th><th>Importe</th><th>Acciones</th></tr></thead>
-        <tbody>{pagination.visible.map(({ payment, customer, vehicle, status, flexible }) => <tr key={payment.id}>
-          <td><p className="font-bold">{customer?.name || 'Cliente no disponible'}</p><p className="text-xs text-stone-500">{vehicleLabel(vehicle)} · {vehicle?.plate}</p></td>
+        <tbody>{pagination.visible.map(({ payment, rental, customer, vehicle, status, flexible }) => <tr key={payment.id}>
+          <td><p className="font-bold">{customer?.name || 'Cliente no disponible'}</p><p className="flex flex-wrap items-center gap-2 text-xs text-stone-500">{vehicleLabel(vehicle, rental?.vehicleSnapshot)} · {vehiclePlate(vehicle, rental?.vehicleSnapshot)}<VehicleStateBadge vehicle={vehicle} snapshot={rental?.vehicleSnapshot}/></p></td>
           <td>{date(payment.dueDate)}{payment.paidDate && <span className="block text-xs text-stone-500">Pagado: {date(payment.paidDate)}</span>}</td>
           <td>{paymentKindLabel(payment)}{payment.mileageCharge && <span className="mt-1 block max-w-xs text-xs text-stone-500">{payment.kmExtraRelated} km × {euroWithCents.format(payment.kmExtraPrice || 0)} · Base {euroWithCents.format(payment.kmExtraBaseAmount || 0)} + IVA {payment.kmExtraVatRate}% ({euroWithCents.format(payment.kmExtraVatAmount || 0)})</span>}{flexible && payment.flexibleNotes && <span className="block text-xs text-stone-500">{payment.flexibleNotes}</span>}</td>
           <td><Badge tone={flexible && status !== 'pagado' ? 'info' : tones[status]}>{flexible && status !== 'pagado' ? 'flexible' : status}</Badge></td>
@@ -133,7 +134,7 @@ export default function PaymentsPage() {
     {editing && <Modal title={editing.id ? 'Editar pago' : 'Registrar pago'} onClose={() => setEditing(null)}>
       <form onSubmit={save} className="grid gap-4 sm:grid-cols-2">
         {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700 sm:col-span-2">{error}</p>}
-        <label className="sm:col-span-2"><span className="label">Alquiler *</span><select className="field" name="rentalId" defaultValue={editing.rentalId} required>{state.rentals.map(rental => { const customer = state.customers.find(item => item.id === rental.customerId), vehicle = state.vehicles.find(item => item.id === rental.vehicleId); return <option key={rental.id} value={rental.id}>{customer?.name} · {vehicleLabel(vehicle)} ({vehicle?.plate})</option> })}</select></label>
+        <label className="sm:col-span-2"><span className="label">Alquiler *</span><select className="field" name="rentalId" defaultValue={editing.rentalId} required>{state.rentals.map(rental => { const customer = state.customers.find(item => item.id === rental.customerId), vehicle = state.vehicles.find(item => item.id === rental.vehicleId); return <option key={rental.id} value={rental.id}>{customer?.name} · {vehicleLabel(vehicle, rental.vehicleSnapshot)} ({vehiclePlate(vehicle, rental.vehicleSnapshot)})</option> })}</select></label>
         <Field label="Fecha de pago" name="dueDate" type="date" value={editing.dueDate}/>
         <Field label="Importe (€)" name="amount" type="number" value={editing.amount}/>
         <label><span className="label">Tipo de pago</span><select className="field" name="type" defaultValue={editing.type || (editing.status === 'flexible' ? 'flexible' : 'normal')}>{paymentTypes.map(value => <option key={value} value={value}>{paymentTypeLabels[value]}</option>)}</select></label>

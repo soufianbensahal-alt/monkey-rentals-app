@@ -6,7 +6,8 @@ import type { FleetState, Rental } from '../types'
 import { calculateMileage, getVehicleMileage, mileageReport } from './mileage'
 import { buildReport, economicMovements, type EconomicMovement } from './reports'
 import { getVehicleStatusMap } from './vehicleStatus'
-import { vehicleLabel } from './vehicles'
+import { activeVehicles, isRetired, retiredVehicles, vehicleLabel, vehiclePlate, vehicleSnapshots } from './vehicles'
+import { retirementReasons } from './vehicleLifecycle'
 import { isFlexiblePayment, paymentReminderLabel, reminderFrequencyLabels } from './paymentReminders'
 
 const colors = { orange: '#F97316', ink: '#164E63', green: '#047857', red: '#B91C1C', muted: '#64748B' }
@@ -95,8 +96,9 @@ export function buildReportWorkbook(state: FleetState, today: string, generatedB
     ...state.taxes.map(item => [`tax-${item.id}`, { notes: item.notes, concept: item.concept, origin: 'Impuesto' }] as const),
     ...state.fines.map(item => [`fine-${item.id}`, { notes: item.notes, concept: item.concept, origin: 'Multa' }] as const),
   ])
-  const vname = (id?: string) => id ? vehicleLabel(vehicles.get(id)) : ''
-  const plate = (id?: string) => id ? vehicles.get(id)?.plate : ''
+  const snapshots = vehicleSnapshots(state)
+  const vname = (id?: string) => id ? vehicleLabel(vehicles.get(id), snapshots.get(id)) : ''
+  const plate = (id?: string) => id ? vehiclePlate(vehicles.get(id), snapshots.get(id)) : ''
   const cname = (id?: string) => id ? customers.get(id)?.name || 'Cliente eliminado' : ''
   const relatedRental = (item: EconomicMovement) => payments.get(item.id)?.rentalId || (item.id.startsWith('rental-') ? item.id.slice(7) : '')
   const frequency = (item: EconomicMovement) => {
@@ -128,6 +130,8 @@ export function buildReportWorkbook(state: FleetState, today: string, generatedB
     total('Beneficio estimado del mes', profit(summary.monthProfit)),
     total('Vehículo con más ingresos', text(summary.topIncomeVehicleId ? `${vname(summary.topIncomeVehicleId)} · ${plate(summary.topIncomeVehicleId)}` : 'Sin cobros registrados')),
     total('Número total de vehículos', number(state.vehicles.length)),
+    total('Vehículos activos', number(activeVehicles(state).length)),
+    total('Vehículos dados de baja', number(retiredVehicles(state).length)),
     total('Número de clientes', number(state.customers.length)),
     total('Número de alquileres activos', number(state.rentals.filter(isActive).length)),
     total('Número de pagos pendientes / previsiones', number(pending.length)),
@@ -174,7 +178,7 @@ export function buildReportWorkbook(state: FleetState, today: string, generatedB
     const next = state.rentals.filter(r => r.vehicleId === v.id && isReservation(r)).sort((a, b) => a.startDate.localeCompare(b.startDate))[0]
     const income = sum(incomes.filter(item => item.vehicleId === v.id && item.status === 'pagado'))
     const expense = sum(paidExpenses.filter(item => item.vehicleId === v.id))
-    return [text(v.plate), text(v.brand), text(v.model), number(v.year), text(v.category), status(info.label.toLowerCase()), text(info.status === 'alquilado' ? info.customer?.name : ''), date(next?.startDate), money(v.dailyRate), money(v.weeklyRate), money(v.monthlyRate), number(v.includedKmPerDay), money(v.extraKmRate), money(Math.round(v.extraKmRate * 1.21 * 100) / 100), money(income, colors.green), money(expense), profit(income - expense), text(v.notes)]
+    return [text(v.plate), text(v.brand), text(v.model), number(v.year), text(v.category), status(isRetired(v) ? 'de baja' : info.label.toLowerCase()), text(info.status === 'alquilado' ? info.customer?.name : ''), date(next?.startDate), money(v.dailyRate), money(v.weeklyRate), money(v.monthlyRate), number(v.includedKmPerDay), money(v.extraKmRate), money(Math.round(v.extraKmRate * 1.21 * 100) / 100), money(income, colors.green), money(expense), profit(income - expense), text(v.notes)]
   }), [total('Total vehículos', number(state.vehicles.length)), total('Ingresos de la flota actual', money(sum(incomes.filter(item => !!item.vehicleId && vehicles.has(item.vehicleId) && item.status === 'pagado')))), total('Gastos de la flota actual', money(sum(paidExpenses.filter(item => !!item.vehicleId && vehicles.has(item.vehicleId)))))]))
   sheets.push(table('Clientes', ['Nombre', 'Teléfono', 'Email', 'DNI / NIE / CIF', 'Número de alquileres', 'Alquiler activo', 'Vehículo actual', 'Reservas futuras', 'Total pagado', 'Total pendiente', 'Total atrasado', 'Multas vinculadas', 'Documentos subidos', 'Notas'], state.customers.map(c => {
     const related = state.rentals.filter(r => r.customerId === c.id)
@@ -219,9 +223,9 @@ export function buildReportWorkbook(state: FleetState, today: string, generatedB
     const km = calculateMileage(r, vehicles.get(r.vehicleId))
     return [r.kmStart === undefined ? text() : number(r.kmStart), r.kmEnd === undefined ? text() : number(r.kmEnd), km.used === undefined ? text() : number(km.used), r.kmIncludedTotal === undefined ? text() : number(r.kmIncludedTotal), text(r.kmExtraEnabled ? 'Sí' : 'No'), km.extra === undefined ? text() : number(km.extra), km.price === undefined ? text() : money(km.price), number(km.vatRate), km.base === undefined ? text() : money(km.base), km.vat === undefined ? text() : money(km.vat), km.total === undefined ? text() : money(km.total), text(r.kmExtraPaymentId), text(r.returnCondition), text(r.returnNotes)]
   }))
-  appendColumns('Vehículos', ['Kilometraje actual', 'Última actualización de km', 'Km realizados en alquileres'], state.vehicles.map(v => {
+  appendColumns('Vehículos', ['Kilometraje actual', 'Última actualización de km', 'Km realizados en alquileres', 'Alta / baja', 'Motivo de baja', 'Fecha de baja', 'Notas de baja'], state.vehicles.map(v => {
     const km = getVehicleMileage(state, v.id)
-    return [km.currentKm === undefined ? text() : number(km.currentKm), date(km.lastKmUpdate), number(km.totalUsed)]
+    return [km.currentKm === undefined ? text() : number(km.currentKm), date(km.lastKmUpdate), number(km.totalUsed), text(isRetired(v) ? 'De baja' : 'Activo'), text(v.baja ? retirementReasons[v.baja.motivo] : ''), date(v.baja?.fecha), text(v.baja?.notas)]
   }))
   appendColumns('Clientes', ['Km realizados', 'Km extra acumulados', 'Cobrado por km extra'], state.customers.map(c => {
     const related = state.rentals.filter(r => r.customerId === c.id && r.status !== 'cancelado')

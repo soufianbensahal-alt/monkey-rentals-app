@@ -23,6 +23,21 @@ describe('FleetContext',()=>{
     expect(result.current.state.adminSettings.name).toBe('Jonathan')
   })
 
+  it('eliminar un vehículo conserva sus alquileres y pagos con un snapshot',()=>{
+    const {result}=renderHook(()=>useFleet(),{wrapper:FleetProvider})
+    act(()=>{
+      result.current.upsert('vehicles',{id:'v-del',plate:'9999ZZZ',brand:'Fiat',model:'Doblo',category:'Furgoneta',year:2020,dailyRate:30,weeklyRate:180,monthlyRate:600,includedKmPerDay:100,extraKmRate:.1,status:'disponible',notes:''})
+      result.current.upsert('rentals',{id:'r-del',vehicleId:'v-del',customerId:'c1',startDate:'2026-06-01',endDate:'2026-06-30',agreedPrice:600,pricePeriod:'mes',expectedKilometers:0,status:'finalizado',notes:''})
+      result.current.upsert('payments',{id:'p-del',rentalId:'r-del',dueDate:'2026-06-01',amount:600,status:'pagado',notes:''})
+      result.current.upsert('maintenance',{id:'m-del',vehicleId:'v-del',date:'2026-06-10',type:'Revisión',cost:50,status:'completado',notes:''})
+    })
+    act(()=>result.current.remove('vehicles','v-del'))
+    expect(result.current.state.vehicles).toHaveLength(0)
+    expect(result.current.state.rentals[0]).toMatchObject({id:'r-del',vehicleSnapshot:{plate:'9999ZZZ',label:'Fiat Doblo'}})
+    expect(result.current.state.payments.map(p=>p.id)).toEqual(['p-del'])
+    expect(result.current.state.maintenance).toHaveLength(0)
+  })
+
   it('persiste los nuevos datos en localStorage v4',async()=>{
     const {result}=renderHook(()=>useFleet(),{wrapper:FleetProvider})
     act(()=>result.current.upsert('tasks',{id:'test',title:'Revisar contrato',dueDate:'2026-06-15',priority:'alta',completed:false,category:'Test'}))

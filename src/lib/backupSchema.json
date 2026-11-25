@@ -47,6 +47,37 @@
                   }
                 ]
               },
+              "vehicleSnapshot": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "plate": {
+                        "type": "string"
+                      },
+                      "brand": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "deletedAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "plate",
+                      "brand",
+                      "model",
+                      "label",
+                      "deletedAt"
+                    ]
+                  }
+                ]
+              },
               "cancelled": {
                 "anyOf": [
                   {
@@ -143,6 +174,187 @@
       "items": {
         "type": "object",
         "properties": {
+          "estado": {
+            "anyOf": [
+              {
+                "const": "activo"
+              },
+              {
+                "const": "baja"
+              }
+            ]
+          },
+          "baja": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "motivo": {
+                    "anyOf": [
+                      {
+                        "const": "venta"
+                      },
+                      {
+                        "const": "siniestro_total"
+                      },
+                      {
+                        "const": "robo"
+                      },
+                      {
+                        "const": "fin_renting"
+                      },
+                      {
+                        "const": "desguace"
+                      },
+                      {
+                        "const": "traspaso"
+                      },
+                      {
+                        "const": "otro"
+                      }
+                    ]
+                  },
+                  "fecha": {
+                    "type": "string"
+                  },
+                  "notas": {
+                    "type": "string"
+                  },
+                  "registradaPor": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "registradaAt": {
+                    "type": "string"
+                  },
+                  "precioVenta": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      }
+                    ]
+                  },
+                  "comprador": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "numeroSiniestro": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "aseguradora": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "motivo",
+                  "fecha",
+                  "notas",
+                  "registradaAt"
+                ]
+              }
+            ]
+          },
+          "estadoHistorial": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "estadoAnterior": {
+                      "anyOf": [
+                        {
+                          "const": "activo"
+                        },
+                        {
+                          "const": "baja"
+                        }
+                      ]
+                    },
+                    "estadoNuevo": {
+                      "anyOf": [
+                        {
+                          "const": "activo"
+                        },
+                        {
+                          "const": "baja"
+                        }
+                      ]
+                    },
+                    "motivo": {
+                      "anyOf": [
+                        {
+                          "const": "venta"
+                        },
+                        {
+                          "const": "siniestro_total"
+                        },
+                        {
+                          "const": "robo"
+                        },
+                        {
+                          "const": "fin_renting"
+                        },
+                        {
+                          "const": "desguace"
+                        },
+                        {
+                          "const": "traspaso"
+                        },
+                        {
+                          "const": "otro"
+                        }
+                      ]
+                    },
+                    "fechaBaja": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "notas": {
+                      "type": "string"
+                    },
+                    "usuario": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "fecha": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "estadoAnterior",
+                    "estadoNuevo",
+                    "notas",
+                    "fecha"
+                  ]
+                }
+              }
+            ]
+          },
           "id": {
             "type": "string"
           },
@@ -307,6 +519,37 @@
           "vehicleId": {
             "type": "string"
           },
+          "vehicleSnapshot": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "plate": {
+                    "type": "string"
+                  },
+                  "brand": {
+                    "type": "string"
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "deletedAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "plate",
+                  "brand",
+                  "model",
+                  "label",
+                  "deletedAt"
+                ]
+              }
+            ]
+          },
           "customerId": {
             "type": "string"
           },
@@ -326,6 +569,9 @@
           "pricePeriod": {
             "anyOf": [
               {
+                "const": "otro"
+              },
+              {
                 "const": "dia"
               },
               {
@@ -333,9 +579,6 @@
               },
               {
                 "const": "mes"
-              },
-              {
-                "const": "otro"
               }
             ]
           },
@@ -968,13 +1211,13 @@
           "priority": {
             "anyOf": [
               {
+                "const": "baja"
+              },
+              {
                 "const": "alta"
               },
               {
                 "const": "media"
-              },
-              {
-                "const": "baja"
               }
             ]
           },
@@ -1324,6 +1567,37 @@
           "vehicleId": {
             "type": "string"
           },
+          "vehicleSnapshot": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "plate": {
+                    "type": "string"
+                  },
+                  "brand": {
+                    "type": "string"
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "deletedAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "plate",
+                  "brand",
+                  "model",
+                  "label",
+                  "deletedAt"
+                ]
+              }
+            ]
+          },
           "customerId": {
             "anyOf": [
               {
@@ -1405,10 +1679,10 @@
           "type": {
             "anyOf": [
               {
-                "const": "mantenimiento"
+                "const": "otro"
               },
               {
-                "const": "otro"
+                "const": "mantenimiento"
               },
               {
                 "const": "multa"
@@ -1537,13 +1811,13 @@
           "priority": {
             "anyOf": [
               {
+                "const": "baja"
+              },
+              {
                 "const": "alta"
               },
               {
                 "const": "media"
-              },
-              {
-                "const": "baja"
               }
             ]
           },
@@ -1616,6 +1890,37 @@
               }
             ]
           },
+          "vehicleSnapshot": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "plate": {
+                    "type": "string"
+                  },
+                  "brand": {
+                    "type": "string"
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "deletedAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "plate",
+                  "brand",
+                  "model",
+                  "label",
+                  "deletedAt"
+                ]
+              }
+            ]
+          },
           "rentalId": {
             "anyOf": [
               {
@@ -1669,10 +1974,10 @@
                   "items": {
                     "anyOf": [
                       {
-                        "const": "mantenimiento"
+                        "const": "otro"
                       },
                       {
-                        "const": "otro"
+                        "const": "mantenimiento"
                       },
                       {
                         "const": "multa"

@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 import { Brand } from './Brand'
 import { useFleet } from '../store/FleetContext'
-import { vehicleLabel } from '../lib/vehicles'
+import { activeVehicles, vehicleLabel, vehiclePlate } from '../lib/vehicles'
 import { getSystemAlerts } from '../lib/alerts'
 import { getVehicleStatusMap } from '../lib/vehicleStatus'
 
@@ -93,7 +93,7 @@ export function AppLayout() {
     const query = deferredSearch.trim().toLowerCase()
     if (!query) return []
     return [
-      ...state.vehicles
+      ...activeVehicles(state)
         .filter(vehicle => {
           const calculated = vehicleStatuses.get(vehicle.id)
           return `${vehicleLabel(vehicle)} ${vehicle.plate} ${vehicle.brand} ${vehicle.model} ${calculated?.label} ${calculated?.detail}`.toLowerCase().includes(query)
@@ -109,12 +109,12 @@ export function AppLayout() {
         .filter(rental => {
           const customer = state.customers.find(item => item.id === rental.customerId)
           const vehicle = state.vehicles.find(item => item.id === rental.vehicleId)
-          return `${customer?.name} ${vehicleLabel(vehicle)} ${vehicle?.plate} ${rental.status}`.toLowerCase().includes(query)
+          return `${customer?.name} ${vehicleLabel(vehicle, rental.vehicleSnapshot)} ${vehiclePlate(vehicle, rental.vehicleSnapshot)} ${rental.status}`.toLowerCase().includes(query)
         })
         .map(rental => ({
           id: rental.id,
           title: state.customers.find(customer => customer.id === rental.customerId)?.name || 'Alquiler',
-          detail: vehicleLabel(state.vehicles.find(vehicle => vehicle.id === rental.vehicleId)),
+          detail: vehicleLabel(state.vehicles.find(vehicle => vehicle.id === rental.vehicleId), rental.vehicleSnapshot),
           to: '/app/alquileres',
         })),
     ].slice(0, 8)

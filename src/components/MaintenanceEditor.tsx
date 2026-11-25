@@ -6,6 +6,7 @@ import { materialCategories, materialTotal, maintenanceCosts } from '../lib/main
 import { discardStagedPhotos, materialPhotoUrl, uploadMaterialPhoto } from '../lib/materialPhotos'
 import { deletePrivateFile, uploadPrivateFile } from '../lib/privateFiles'
 import { euroWithCents as money, uid } from '../lib/format'
+import { vehicleOptionLabel, vehicleOptions } from '../lib/vehicles'
 import type { MaintenanceFile, MaintenanceMaterial, MaintenanceRecord, MaterialPhoto } from '../types'
 
 const editableNumber=(value:number|undefined)=>Number.isFinite(value)?value:''
@@ -59,7 +60,7 @@ export function MaintenanceEditor({item,onClose,onSaved}:{item:MaintenanceRecord
   }
   return <Modal title={item.id?'Editar mantenimiento':'Añadir mantenimiento'} onClose={()=>{if(!busy)onClose()}}><form onSubmit={save} className="grid gap-4 sm:grid-cols-2">
     {error&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700 sm:col-span-2">{error}</p>}
-    <label><span className="label">Vehículo</span><select className="field" required value={draft.vehicleId} onChange={e=>set({vehicleId:e.target.value})}>{state.vehicles.map(v=><option key={v.id} value={v.id}>{v.plate} · {v.name||v.model}</option>)}</select></label>
+    <label><span className="label">Vehículo</span><select className="field" required value={draft.vehicleId} onChange={e=>set({vehicleId:e.target.value})}>{vehicleOptions(state,item.vehicleId).map(v=><option key={v.id} value={v.id}>{v.plate} · {v.name||v.model}{vehicleOptionLabel(v)}</option>)}</select></label>
     <label><span className="label">Intervención</span><input className="field" required value={draft.type} onChange={e=>set({type:e.target.value})}/></label>
     <label><span className="label">Fecha</span><input className="field" type="date" required value={draft.date} onChange={e=>set({date:e.target.value})}/></label>
     <label><span className="label">Estado</span><select className="field" value={draft.status} onChange={e=>set({status:e.target.value as MaintenanceRecord['status']})}><option value="programado">Pendiente</option><option value="en curso">En curso</option><option value="completado">Finalizado</option></select></label>

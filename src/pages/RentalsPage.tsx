@@ -10,7 +10,8 @@ import { RentalMileageFields } from '../components/RentalMileageFields'
 import { PrivateFileView } from '../components/PrivateFileView'
 import { deletePrivateFile, uploadPrivateFile } from '../lib/privateFiles'
 import { calculateMileage, getVehicleMileage, mileagePayment } from '../lib/mileage'
-import { vehicleLabel } from '../lib/vehicles'
+import { activeVehicles, isRetired, vehicleLabel, vehicleOptionLabel, vehicleOptions, vehiclePlate } from '../lib/vehicles'
+import { VehicleStateBadge } from '../components/VehicleLifecycle'
 import { usePagination } from '../lib/pagination'
 import { ListPagination } from '../components/ListPagination'
 import type { FleetState, PricePeriod, ReminderFrequency, Rental, RentalDocument, RentalDocumentType, RentalMileage, RentalStatus } from '../types'
@@ -51,18 +52,19 @@ export default function RentalsPage() {
   const deferred = useDeferredValue(query)
   const [error, setError] = useState('')
 
+  const fleet = activeVehicles(state)
   const blank = (): Rental => ({
     id:'',
-    vehicleId:state.vehicles[0]?.id || '',
+    vehicleId:fleet[0]?.id || '',
     customerId:state.customers[0]?.id || '',
     startDate:new Date().toISOString().slice(0, 10),
     endDate:'',
-    agreedPrice:state.vehicles[0]?.monthlyRate || 0,
+    agreedPrice:fleet[0]?.monthlyRate || 0,
     pricePeriod:'mes',
     durationDays:1,
     expectedKilometers:0,
     nextPaymentDate:'',
-    nextPaymentAmount:state.vehicles[0]?.monthlyRate || 0,
+    nextPaymentAmount:fleet[0]?.monthlyRate || 0,
     paymentReminderFrequency:'monthly',
     paymentRecurrenceType:'recurrente',
     status:'activo',
@@ -76,7 +78,7 @@ export default function RentalsPage() {
     const customer = customerById.get(rental.customerId)
     const vehicle = vehicleById.get(rental.vehicleId)
     return (filter === 'todos' || rental.status === filter)
-      && `${customer?.name} ${vehicleLabel(vehicle)} ${vehicle?.plate} ${rental.status}`.toLowerCase().includes(deferred.toLowerCase())
+      && `${customer?.name} ${vehicleLabel(vehicle, rental.vehicleSnapshot)} ${vehiclePlate(vehicle, rental.vehicleSnapshot)} ${rental.status}`.toLowerCase().includes(deferred.toLowerCase())
   }), [state.rentals, customerById, vehicleById, filter, deferred])
   const pagination=usePagination(rows,25)
 
@@ -86,7 +88,11 @@ export default function RentalsPage() {
     const vehicle = vehicleById.get(values.vehicleId)
     if (!values.vehicleId || !values.customerId) { setError('Selecciona un cliente y un vehículo.'); return }
     if (values.pricePeriod === 'dia' && (!values.durationDays || values.durationDays <= 0)) { setError('Introduce el número de días del alquiler.'); return }
-    if (values.pricePeriod !== 'otro' && calculateRecommendedRentalPrice(vehicle, values.pricePeriod, values.durationDays) === null) { setError('Este vehículo no tiene tarifa configurada para este periodo.'); return }
+    const keepsDeletedVehicle = !vehicle && !!editing?.vehicleSnapshot && editing.vehicleId === values.vehicleId
+    if (!vehicle && !keepsDeletedVehicle) { setError('Selecciona un vehículo de la flota.'); return }
+    if (isRetired(vehicle) && (values.status === 'activo' || values.status === 'pendiente')) { setError('Este vehículo está dado de baja. Reactívalo en Flota › Archivados o elige otro vehículo.'); return }
+    if (keepsDeletedVehicle && (values.status === 'activo' || values.status === 'pendiente')) { setError('Este vehículo se eliminó de la flota. Elige otro vehículo para un alquiler activo o pendiente.'); return }
+    if (vehicle && values.pricePeriod !== 'otro' && calculateRecommendedRentalPrice(vehicle, values.pricePeriod, values.durationDays) === null) { setError('Este vehículo no tiene tarifa configurada para este periodo.'); return }
     if (!values.agreedPrice || values.agreedPrice <= 0) { setError('El precio acordado debe ser superior a 0 €.'); return }
 
     const { createMileageCharge, ...rentalValues } = values
@@ -95,6 +101,7 @@ export default function RentalsPage() {
       ...rentalValues,
       id:editing?.id || values.id,
       vehicleId:values.vehicleId,
+      vehicleSnapshot:keepsDeletedVehicle ? editing?.vehicleSnapshot : undefined,
       customerId:values.customerId,
       startDate:values.startDate,
       endDate:values.endDate || (values.status === 'finalizado' ? new Date().toISOString().slice(0,10) : undefined),
@@ -109,6 +116,7 @@ export default function RentalsPage() {
       status:values.status,
       notes:values.notes.trim(),
     }
+    if (!item.vehicleSnapshot) delete item.vehicleSnapshot
 
     try { await saveRentalConfirmed(item, createMileageCharge) } catch (error) { setError(error instanceof Error ? error.message : 'No se ha podido confirmar el alquiler en Supabase.'); throw error }
     if (!editing?.id && item.nextPaymentDate) await upsertConfirmed('payments', {
@@ -130,7 +138,7 @@ export default function RentalsPage() {
   const finalize = (rental: Rental) => {
     open({ ...rental, status:'finalizado', endDate:new Date().toISOString().slice(0, 10) })
   }
-  const canCreate = state.vehicles.length > 0 && state.customers.length > 0
+  const canCreate = fleet.length > 0 && state.customers.length > 0
 
   return <div className="fade-up">
     <PageHeader eyebrow="Contratos" title="Alquileres" description="Gestiona alquileres por días, semanas y meses con tarifas automáticas editables." action={state.rentals.length > 0 ? <button className="btn-primary" disabled={!canCreate} onClick={() => open(blank())}><Plus size={18}/> Crear alquiler</button> : undefined}/>
@@ -142,7 +150,7 @@ export default function RentalsPage() {
       const vehicle = vehicleById.get(rental.vehicleId)
       const customer = customerById.get(rental.customerId)
       const km = calculateMileage(rental, vehicle)
-      return <tr key={rental.id}><td><div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-brand-50 text-brand-600"><KeyRound size={19}/></span><div><p className="font-bold">{vehicleLabel(vehicle)}</p><p className="text-xs text-stone-500">{customer?.name} · {vehicle?.plate}</p></div></div></td><td>{date(rental.startDate)}<span className="block text-xs text-stone-500">{rental.endDate ? `hasta ${date(rental.endDate)}` : 'Sin fecha final'}</span></td><td><Badge tone={tones[rental.status]}>{rental.status}</Badge></td><td>{rental.nextPaymentDate ? date(rental.nextPaymentDate) : 'Sin recordatorio'}{rental.nextPaymentDate && <span className="block text-xs text-stone-500">{paymentReminderLabel({ id:'preview', rentalId:rental.id, dueDate:rental.nextPaymentDate, amount:rental.nextPaymentAmount || rental.agreedPrice, status:'pendiente', reminderEnabled:rental.paymentReminderFrequency !== 'none', reminderFrequency:rental.paymentReminderFrequency, recurrenceType:rental.paymentRecurrenceType, notes:'' })}</span>}</td><td className="font-bold">{euro.format(rental.agreedPrice)}<span className="block text-xs font-normal text-stone-500">/{periods[rental.pricePeriod]}</span></td><td><p>{km.used === undefined ? 'Km realizados sin completar' : `${km.used.toLocaleString('es-ES')} km realizados`}</p><details className="mt-2 text-xs"><summary className="cursor-pointer font-bold text-brand-600">Detalle de kilometraje</summary><div className="mt-2 space-y-1"><p>Km iniciales: {rental.kmStart ?? '—'}</p><p>Km finales: {rental.kmEnd ?? '—'}</p><p>Km previstos: {rental.expectedKilometers || 'Sin estimación'}</p><p>Km incluidos: {rental.kmIncludedTotal ?? 'Sin acuerdo'}</p><p>Cálculo extra: {rental.kmExtraEnabled ? 'Activado' : 'Desactivado'}</p><p>Km extra: {km.extra ?? '—'}</p><p>Precio/km: {km.price === undefined ? '—' : euroWithCents.format(km.price)}</p><p>Base: {km.base === undefined ? '—' : euroWithCents.format(km.base)} · IVA {km.vatRate}%: {km.vat === undefined ? '—' : euroWithCents.format(km.vat)}</p><p>Total km extra: {km.total === undefined ? '—' : euroWithCents.format(km.total)}</p><p>Devolución: {rental.returnCondition || 'Sin registrar'}</p>{rental.returnNotes && <p>{rental.returnNotes}</p>}</div></details></td><td><div className="flex items-center gap-4"><button onClick={() => open(rental)} aria-label="Editar alquiler" className="text-stone-500 hover:text-brand-600"><Pencil size={18}/></button>{rental.status === 'activo' && <button onClick={() => finalize(rental)} aria-label="Finalizar alquiler" className="text-emerald-700"><CheckCircle2 size={19}/></button>}<ConfirmButton title="Eliminar alquiler" message="¿Seguro que quieres eliminar este alquiler? Esta acción no se puede deshacer." onConfirm={() => remove('rentals', rental.id)}/></div></td></tr>
+      return <tr key={rental.id}><td><div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-brand-50 text-brand-600"><KeyRound size={19}/></span><div><p className="flex flex-wrap items-center gap-2 font-bold">{vehicleLabel(vehicle, rental.vehicleSnapshot)}<VehicleStateBadge vehicle={vehicle} snapshot={rental.vehicleSnapshot}/></p><p className="text-xs text-stone-500">{customer?.name} · {vehiclePlate(vehicle, rental.vehicleSnapshot)}</p></div></div></td><td>{date(rental.startDate)}<span className="block text-xs text-stone-500">{rental.endDate ? `hasta ${date(rental.endDate)}` : 'Sin fecha final'}</span></td><td><Badge tone={tones[rental.status]}>{rental.status}</Badge></td><td>{rental.nextPaymentDate ? date(rental.nextPaymentDate) : 'Sin recordatorio'}{rental.nextPaymentDate && <span className="block text-xs text-stone-500">{paymentReminderLabel({ id:'preview', rentalId:rental.id, dueDate:rental.nextPaymentDate, amount:rental.nextPaymentAmount || rental.agreedPrice, status:'pendiente', reminderEnabled:rental.paymentReminderFrequency !== 'none', reminderFrequency:rental.paymentReminderFrequency, recurrenceType:rental.paymentRecurrenceType, notes:'' })}</span>}</td><td className="font-bold">{euro.format(rental.agreedPrice)}<span className="block text-xs font-normal text-stone-500">/{periods[rental.pricePeriod]}</span></td><td><p>{km.used === undefined ? 'Km realizados sin completar' : `${km.used.toLocaleString('es-ES')} km realizados`}</p><details className="mt-2 text-xs"><summary className="cursor-pointer font-bold text-brand-600">Detalle de kilometraje</summary><div className="mt-2 space-y-1"><p>Km iniciales: {rental.kmStart ?? '—'}</p><p>Km finales: {rental.kmEnd ?? '—'}</p><p>Km previstos: {rental.expectedKilometers || 'Sin estimación'}</p><p>Km incluidos: {rental.kmIncludedTotal ?? 'Sin acuerdo'}</p><p>Cálculo extra: {rental.kmExtraEnabled ? 'Activado' : 'Desactivado'}</p><p>Km extra: {km.extra ?? '—'}</p><p>Precio/km: {km.price === undefined ? '—' : euroWithCents.format(km.price)}</p><p>Base: {km.base === undefined ? '—' : euroWithCents.format(km.base)} · IVA {km.vatRate}%: {km.vat === undefined ? '—' : euroWithCents.format(km.vat)}</p><p>Total km extra: {km.total === undefined ? '—' : euroWithCents.format(km.total)}</p><p>Devolución: {rental.returnCondition || 'Sin registrar'}</p>{rental.returnNotes && <p>{rental.returnNotes}</p>}</div></details></td><td><div className="flex items-center gap-4"><button onClick={() => open(rental)} aria-label="Editar alquiler" className="text-stone-500 hover:text-brand-600"><Pencil size={18}/></button>{rental.status === 'activo' && <button onClick={() => finalize(rental)} aria-label="Finalizar alquiler" className="text-emerald-700"><CheckCircle2 size={19}/></button>}<ConfirmButton title="Eliminar alquiler" message="¿Seguro que quieres eliminar este alquiler? Esta acción no se puede deshacer." onConfirm={() => remove('rentals', rental.id)}/></div></td></tr>
     })}</tbody></table><ListPagination page={pagination.page} pages={pagination.pages} total={pagination.total} onPage={pagination.setPage}/></> : <EmptyState title="No hay alquileres que coincidan." description="Ajusta la búsqueda o cambia el filtro para ver más resultados."/> : <EmptyState title="No hay alquileres creados." description={canCreate ? 'Crea el primer alquiler y elige su periodo.' : 'Añade primero un vehículo y un cliente.'} action={canCreate ? <button className="btn-primary" onClick={() => open(blank())}><Plus size={18}/> Crear alquiler</button> : undefined}/>}</div>
     {editing && <RentalModal rental={editing} state={state} error={error} onClose={() => setEditing(null)} onSave={save}/>}
   </div>
@@ -245,7 +253,7 @@ function RentalModal({ rental, state, error, onClose, onSave }: { rental: Rental
   return <Modal title={rental.id ? 'Editar alquiler' : 'Crear alquiler'} onClose={onClose}>
     <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
       {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700 sm:col-span-2">{error}</p>}
-      <label><span className="label">Vehículo *</span><select name="vehicleId" className="field" value={vehicleId} onChange={event => { const id = event.target.value; setVehicleId(id); setMileage({ ...mileage, kmExtraDefaultPrice: undefined, ...(!rental.id ? { kmStart: getVehicleMileage(state, id).currentKm, kmIncludedPerUnit: state.vehicles.find(v => v.id === id)?.includedKmPerDay } : {}) }); setCreateMileageCharge(false) }} required>{state.vehicles.map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicleLabel(vehicle)} · {vehicle.plate}</option>)}</select></label>
+      <label><span className="label">Vehículo *</span><select name="vehicleId" className="field" value={vehicleId} onChange={event => { const id = event.target.value; setVehicleId(id); setMileage({ ...mileage, kmExtraDefaultPrice: undefined, ...(!rental.id ? { kmStart: getVehicleMileage(state, id).currentKm, kmIncludedPerUnit: state.vehicles.find(v => v.id === id)?.includedKmPerDay } : {}) }); setCreateMileageCharge(false) }} required>{vehicleOptions(state, rental.vehicleId).map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicleLabel(vehicle)} · {vehicle.plate}{vehicleOptionLabel(vehicle)}</option>)}{rental.vehicleSnapshot && !state.vehicles.some(vehicle => vehicle.id === rental.vehicleId) && <option value={rental.vehicleId}>{rental.vehicleSnapshot.label} · {rental.vehicleSnapshot.plate} (eliminado)</option>}</select></label>
       <label><span className="label">Cliente *</span><select name="customerId" className="field" value={customerId} onChange={event => setCustomerId(event.target.value)} required>{state.customers.map(customer => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label>
       <label><span className="label">Tipo de alquiler *</span><select name="pricePeriod" className="field" value={pricePeriod} onChange={event => changePricePeriod(event.target.value as RentalBillingPeriod)}>{billingOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
       {pricePeriod === 'dia' && <label><span className="label">Número de días *</span><input name="durationDays" type="number" min="1" step="1" className="field" value={durationDays} onChange={event => setDurationDays(event.target.value)} required/></label>}

@@ -29,6 +29,7 @@ beforeAll(async()=>{
   await db.exec(readFileSync('supabase/migrations/20261003090732_reduce_egress_private_media.sql','utf8'))
   await db.exec(readFileSync('supabase/migrations/20261017120000_remove_push_notifications.sql','utf8'))
   await db.exec(readFileSync('supabase/migrations/20261029120000_expenses.sql','utf8'))
+  await db.exec(readFileSync('supabase/migrations/20261125120000_expense_vehicle_snapshot.sql','utf8'))
   const state={events:[{id:'event-a',revision:'rev1',type:'itv',status:'active'}],adminSettings:{notifications:{enabled:true,categories:['itv']}}}
   await db.query('insert into fleet_state(id,user_id,state) values ($1,$2,$3),($4,$5,$6)', ['a',a,state,'b',b,{events:[]}])
 },20000)
@@ -51,6 +52,17 @@ describe('políticas de base de datos',()=>{
     await db.exec(`select set_config('request.jwt.claim.sub','${b}',false)`)
     expect((await db.query('select * from expenses')).rows).toHaveLength(0)
     expect((await db.query("delete from expenses where id='e1' returning id")).rows).toHaveLength(0)
+    await db.exec('reset role')
+  })
+  it('guarda el snapshot de un vehículo eliminado solo en gastos propios y con forma válida',async()=>{
+    const snapshot=JSON.stringify({plate:'1234ABC',brand:'Ford',model:'Transit',label:'Ford Transit',deletedAt:'2026-11-25T10:00:00.000Z'})
+    await db.exec(`set role authenticated;select set_config('request.jwt.claim.sub','${a}',false);`)
+    await db.query("insert into expenses(id,user_id,date,amount,category,vehicle_id) values ('s1',$1,'2026-11-01',5,'material','v9'),('s2',$1,'2026-11-01',5,'material',null)",[a])
+    expect((await db.query("update expenses set vehicle_snapshot=$1::jsonb where vehicle_id='v9' returning id",[snapshot])).rows).toEqual([{id:'s1'}])
+    await expect(db.query("update expenses set vehicle_snapshot=$1::jsonb where id='s2'",[snapshot])).rejects.toThrow(/check/)
+    await expect(db.query("update expenses set vehicle_snapshot=$1::jsonb where id='s1'",[JSON.stringify({plate:'X'})])).rejects.toThrow(/check/)
+    await db.exec(`select set_config('request.jwt.claim.sub','${b}',false)`)
+    expect((await db.query("update expenses set vehicle_snapshot=$1::jsonb where vehicle_id='v9' returning id",[snapshot])).rows).toHaveLength(0)
     await db.exec('reset role')
   })
   it('aísla las fotografías privadas por propietario',async()=>{

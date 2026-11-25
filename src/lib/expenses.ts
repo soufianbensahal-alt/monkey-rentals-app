@@ -2,7 +2,7 @@ import { useEffect, useSyncExternalStore } from 'react'
 import { getRemoteOwnerId, privateTable, readRemoteSession } from './remoteStore'
 import { removePrivateObjects, uploadPrivateObject } from './privateFiles'
 import { uid } from './format'
-import type { PrivateFile } from '../types'
+import type { PrivateFile, VehicleSnapshot } from '../types'
 
 export type ExpenseCategory = 'material' | 'combustible' | 'desplazamientos' | 'tramites' | 'compra_vehiculo' | 'otros'
 export type TravelType = 'vuelo' | 'tren' | 'taxi' | 'otro'
@@ -16,6 +16,8 @@ export interface Expense {
   description: string
   supplier?: string
   vehicleId?: string
+  // null clears a stored snapshot (the expense was moved to another vehicle).
+  vehicleSnapshot?: VehicleSnapshot | null
   liters?: number
   odometerKm?: number
   travelType?: TravelType
@@ -36,7 +38,7 @@ export const travelTypes: Record<TravelType, string> = { vuelo: 'Vuelo', tren: '
 export const procedureTypes: Record<ProcedureType, string> = { cambio_nombre: 'Cambio de nombre', transferencia: 'Transferencia', gestoria: 'Gestoría' }
 
 interface ExpenseRow {
-  id: string; user_id: string; date: string; amount: number | string; category: ExpenseCategory; description: string; supplier: string | null; vehicle_id: string | null
+  id: string; user_id: string; date: string; amount: number | string; category: ExpenseCategory; description: string; supplier: string | null; vehicle_id: string | null; vehicle_snapshot?: VehicleSnapshot | null
   liters: number | string | null; odometer_km: number | null; travel_type: TravelType | null; procedure_type: ProcedureType | null
   attachment_name: string | null; attachment_path: string | null; attachment_thumbnail_path: string | null; attachment_mime: string | null; attachment_size: number | null
   created_at: string; updated_at?: string
@@ -48,7 +50,7 @@ export function fromRow(row: ExpenseRow): Expense {
   const mime = row.attachment_mime || ''
   return {
     id: row.id, date: row.date, amount: Number(row.amount), category: row.category, description: row.description || '',
-    supplier: row.supplier || undefined, vehicleId: row.vehicle_id || undefined,
+    supplier: row.supplier || undefined, vehicleId: row.vehicle_id || undefined, vehicleSnapshot: row.vehicle_snapshot || undefined,
     liters: optionalNumber(row.liters), odometerKm: optionalNumber(row.odometer_km),
     travelType: row.travel_type || undefined, procedureType: row.procedure_type || undefined,
     attachment: row.attachment_path ? { id: row.id, fileName: row.attachment_name || 'Ticket', path: row.attachment_path, thumbnailPath: row.attachment_thumbnail_path || undefined, size: row.attachment_size || 0, mimeType: mime, kind: mime === 'application/pdf' ? 'pdf' : 'image', uploadedAt: row.created_at } : undefined,
@@ -78,6 +80,9 @@ export function toRow(expense: Expense, userId: string): Omit<ExpenseRow, 'creat
     attachment_name: e.attachment?.fileName ?? null, attachment_path: e.attachment?.path ?? null, attachment_thumbnail_path: e.attachment?.thumbnailPath ?? null,
     attachment_mime: e.attachment?.mimeType ?? null, attachment_size: e.attachment?.size ?? null,
     created_at: e.createdAt || undefined, updated_at: new Date().toISOString(),
+    // Only sent when set or explicitly cleared: the column comes from a later migration and
+    // an upsert keeps its current value otherwise.
+    ...(e.vehicleSnapshot !== undefined ? { vehicle_snapshot: e.vehicleSnapshot } : {}),
   }
 }
 
@@ -102,18 +107,23 @@ const ownerId = () => {
   return owner
 }
 
+let inflight: Promise<void> | null = null
 export async function loadExpenses(force = false) {
   const owner = getRemoteOwnerId(readRemoteSession())
   if (!owner) { emit({ owner: null, items: [], status: 'idle', error: '' }); return }
-  if (!force && cache.owner === owner && (cache.status === 'ready' || cache.status === 'loading')) return
+  if (!force && cache.owner === owner && cache.status === 'ready') return
+  if (!force && cache.owner === owner && cache.status === 'loading') return inflight ?? undefined
   emit({ owner, items: cache.owner === owner ? cache.items : [], status: 'loading', error: '' })
-  try {
-    const response = await privateTable('expenses', '?select=*&order=date.desc,created_at.desc')
-    const rows = await response.json() as ExpenseRow[]
-    if (cache.owner === owner) emit({ items: sortExpenses(rows.map(fromRow)), status: 'ready' })
-  } catch {
-    if (cache.owner === owner) emit({ status: 'error', error: 'No se han podido cargar los gastos. Comprueba la conexión.' })
-  }
+  inflight = (async () => {
+    try {
+      const response = await privateTable('expenses', '?select=*&order=date.desc,created_at.desc')
+      const rows = await response.json() as ExpenseRow[]
+      if (cache.owner === owner) emit({ items: sortExpenses(rows.map(fromRow)), status: 'ready' })
+    } catch {
+      if (cache.owner === owner) emit({ status: 'error', error: 'No se han podido cargar los gastos. Comprueba la conexión.' })
+    }
+  })()
+  return inflight
 }
 
 export function useExpenses(ownerKey: string | null) {
@@ -152,6 +162,24 @@ export async function deleteExpense(expense: Expense) {
   }
   if (expense.attachment) await removePrivateObjects(expense.attachment, 'expense').catch(() => {})
   if (cache.owner === owner) emit({ items: cache.items.filter(item => item.id !== expense.id) })
+}
+
+// Before a vehicle is deleted, its expenses keep a fixed copy of the vehicle. Fails (and the
+// deletion must stop) when the expenses cannot be read or the column is not migrated yet.
+export async function snapshotVehicleExpenses(vehicleId: string, snapshot: VehicleSnapshot) {
+  const owner = getRemoteOwnerId(readRemoteSession())
+  if (!owner) return 0
+  await loadExpenses(cache.owner === owner && cache.status === 'error')
+  if (cache.owner !== owner || cache.status !== 'ready') throw new Error('No se han podido comprobar los gastos del vehículo. Revisa la conexión antes de eliminarlo.')
+  const linked = cache.items.filter(expense => expense.vehicleId === vehicleId)
+  if (!linked.length) return 0
+  try {
+    await privateTable('expenses', `?vehicle_id=eq.${encodeURIComponent(vehicleId)}`, { method: 'PATCH', body: JSON.stringify({ vehicle_snapshot: snapshot, updated_at: new Date().toISOString() }) })
+  } catch {
+    throw new Error('No se ha podido conservar el vehículo en sus gastos. Comprueba que la migración de gastos está aplicada y vuelve a intentarlo.')
+  }
+  if (cache.owner === owner) emit({ items: cache.items.map(expense => expense.vehicleId === vehicleId ? { ...expense, vehicleSnapshot: snapshot } : expense) })
+  return linked.length
 }
 
 export type VehicleFilter = 'todos' | 'genericos' | 'vinculados' | `vehicle:${string}`

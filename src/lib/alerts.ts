@@ -1,6 +1,6 @@
 import { daysUntil, effectivePaymentStatus, isPaymentAlert } from './payments'
 import { hasMileageAlert } from './mileage'
-import { vehicleLabel } from './vehicles'
+import { isRetired, vehicleLabel } from './vehicles'
 import type { FleetState } from '../types'
 
 export interface SystemAlert {
@@ -15,32 +15,35 @@ export interface SystemAlert {
 }
 
 export function getSystemAlerts(state: FleetState): SystemAlert[] {
+  // ITV, documents, taxes and scheduled maintenance of a retired vehicle no longer need action.
+  const retired = new Set(state.vehicles.filter(isRetired).map(vehicle => vehicle.id))
+  const operating = (item: { vehicleId: string }) => !retired.has(item.vehicleId)
   const payments = state.payments.filter(isPaymentAlert).map(payment => {
     const rental = state.rentals.find(item => item.id === payment.rentalId)
     const customer = state.customers.find(item => item.id === rental?.customerId)
     const status = effectivePaymentStatus(payment)
     return { id:`payment-${payment.id}`, title:status === 'atrasado' ? 'Pago atrasado' : 'Próximo cobro', detail:`${customer?.name || 'Cliente'} · ${payment.amount.toLocaleString('es-ES',{style:'currency',currency:'EUR'})}`, date:payment.dueDate, severity:status === 'atrasado' ? 'danger' as const : 'warning' as const, to:'/app/pagos', paymentId:payment.id }
   })
-  const documents = state.documents.filter(item => daysUntil(item.expiryDate) <= 30).map(item => {
+  const documents = state.documents.filter(operating).filter(item => daysUntil(item.expiryDate) <= 30).map(item => {
     const days = daysUntil(item.expiryDate); const vehicle = state.vehicles.find(v => v.id === item.vehicleId)
     return { id:`document-${item.id}`, title:days < 0 ? `${item.type} caducada` : `${item.type} próxima a vencer`, detail:`${vehicleLabel(vehicle)} · ${vehicle?.plate || ''}`, date:item.expiryDate, severity:days < 0 ? 'danger' as const : 'warning' as const, to:`/app/documentacion?vehicle=${item.vehicleId}` }
   })
-  const taxes = state.taxes.filter(item => item.status === 'pendiente' && daysUntil(item.dueDate) <= 14).map(item => {
+  const taxes = state.taxes.filter(operating).filter(item => item.status === 'pendiente' && daysUntil(item.dueDate) <= 14).map(item => {
     const days = daysUntil(item.dueDate); const vehicle = state.vehicles.find(v => v.id === item.vehicleId)
     return { id:`tax-${item.id}`, title:days < 0 ? 'Impuesto pendiente vencido' : 'Impuesto próximo', detail:`${item.concept} · ${vehicleLabel(vehicle)}`, date:item.dueDate, severity:days < 0 ? 'danger' as const : 'warning' as const, to:`/app/documentacion?vehicle=${item.vehicleId}` }
   })
-  const maintenance = state.maintenance.filter(item => item.status === 'programado' && daysUntil(item.date) <= 14).map(item => {
+  const maintenance = state.maintenance.filter(operating).filter(item => item.status === 'programado' && daysUntil(item.date) <= 14).map(item => {
     const days = daysUntil(item.date); const vehicle = state.vehicles.find(v => v.id === item.vehicleId)
     return { id:`maintenance-${item.id}`, title:days < 0 ? 'Mantenimiento atrasado' : 'Mantenimiento programado', detail:`${item.type} · ${vehicleLabel(vehicle)}`, date:item.date, severity:days < 0 ? 'danger' as const : 'info' as const, to:'/app/mantenimiento' }
   })
   const fines = state.fines.filter(item => item.status === 'pendiente' || item.status === 'reclamada').map(item => {
     const vehicle = state.vehicles.find(v => v.id === item.vehicleId)
     const customer = state.customers.find(c => c.id === item.customerId)
-    return { id:`fine-${item.id}`, title:item.status === 'reclamada' ? 'Multa reclamada' : 'Multa pendiente', detail:`${vehicleLabel(vehicle)} · ${customer?.name || 'Sin cliente vinculado'}`, date:item.infractionDate, severity:'warning' as const, to:`/app/documentacion?vehicle=${item.vehicleId}` }
+    return { id:`fine-${item.id}`, title:item.status === 'reclamada' ? 'Multa reclamada' : 'Multa pendiente', detail:`${vehicleLabel(vehicle, item.vehicleSnapshot)} · ${customer?.name || 'Sin cliente vinculado'}`, date:item.infractionDate, severity:'warning' as const, to:`/app/documentacion?vehicle=${item.vehicleId}` }
   })
   const mileage = state.rentals.filter(hasMileageAlert).map(rental => ({
     id:`mileage-${rental.id}`, rentalId:rental.id, title:'Faltan km finales del alquiler.',
-    detail:`${vehicleLabel(state.vehicles.find(v => v.id === rental.vehicleId))} · ${state.customers.find(c => c.id === rental.customerId)?.name || 'Cliente'}`,
+    detail:`${vehicleLabel(state.vehicles.find(v => v.id === rental.vehicleId), rental.vehicleSnapshot)} · ${state.customers.find(c => c.id === rental.customerId)?.name || 'Cliente'}`,
     date:rental.endDate || rental.startDate, severity:'warning' as const,
     to:`/app/alquileres?edit=${encodeURIComponent(rental.id)}`,
   }))

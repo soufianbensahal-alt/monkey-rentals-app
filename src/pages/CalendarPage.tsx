@@ -1,4 +1,4 @@
-import type { CalendarEvent } from '../types'
+import type { CalendarEvent, FleetState } from '../types'
 import { uid } from '../lib/format'
 import { ReminderEditor } from '../components/ReminderEditor'
 import { UpcomingReminders } from '../components/UpcomingReminders'
@@ -59,6 +59,8 @@ const eventStyle: Record<EventType, { label: string; icon: LucideIcon; dot: stri
   reserva: { label: 'Reserva', icon: CalendarCheck, dot: 'bg-teal-700', badge: 'bg-teal-100 text-teal-900', card: 'border-teal-200 bg-teal-50/70' },
 }
 
+// Expiry dates of a retired vehicle after its retirement date are no longer actionable.
+const afterRetirement = (state: FleetState, vehicleId: string, value: string) => { const baja = state.vehicles.find(vehicle => vehicle.id === vehicleId)?.baja; return !!baja && value > baja.fecha }
 const iso = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
 const fromIso = (value: string) => new Date(`${value}T12:00:00`)
 const monthName = (month: number) => new Intl.DateTimeFormat('es-ES', { month: 'long' }).format(new Date(2026, month, 1))
@@ -94,7 +96,7 @@ export default function CalendarPage() {
       return {
         id: `payment-${payment.id}`,
         date: payment.dueDate,
-        title: status === 'atrasado' ? `${customer?.name || 'Cliente'} · pago atrasado` : `Pago ${vehicleLabel(vehicle)}`,
+        title: status === 'atrasado' ? `${customer?.name || 'Cliente'} · pago atrasado` : `Pago ${vehicleLabel(vehicle, rental?.vehicleSnapshot)}`,
         detail: `${payment.type === 'km_extra' ? 'Km extra · ' : ''}${euro.format(payment.amount)} · ${customer?.name || 'Cliente'} · ${paymentReminderLabel(payment)}`,
         type,
       }
@@ -102,7 +104,7 @@ export default function CalendarPage() {
     ...state.rentals.flatMap(rental => {
       const vehicle = state.vehicles.find(item => item.id === rental.vehicleId)
       const customer = state.customers.find(item => item.id === rental.customerId)
-      const detail = `${vehicleLabel(vehicle)} · ${customer?.name || 'Cliente'}`
+      const detail = `${vehicleLabel(vehicle, rental.vehicleSnapshot)} · ${customer?.name || 'Cliente'}`
       return [
         ...(hasMileageAlert(rental) ? [{ id: `mileage-${rental.id}`, date: rental.endDate || rental.startDate, title: 'Faltan km finales del alquiler.', detail, type: 'alquiler' as const }] : []),
         { id: `rental-start-${rental.id}`, date: rental.startDate, title: 'Entrega de vehículo', detail, type: 'alquiler' as const },
@@ -110,9 +112,9 @@ export default function CalendarPage() {
       ]
     }),
     ...state.maintenance.map(item => ({ id: `maintenance-${item.id}`, date: item.date, title: item.type, detail: vehicleLabel(state.vehicles.find(vehicle => vehicle.id === item.vehicleId)), type: 'mantenimiento' as const })),
-    ...state.documents.map(item => ({ id: `document-${item.id}`, date: item.expiryDate, title: `Vence ${item.type}`, detail: vehicleLabel(state.vehicles.find(vehicle => vehicle.id === item.vehicleId)), type: item.type.toLowerCase().includes('itv') ? 'itv' as const : 'documento' as const })),
-    ...state.taxes.map(item => ({ id: `tax-${item.id}`, date: item.dueDate, title: item.concept, detail: `${vehicleLabel(state.vehicles.find(vehicle => vehicle.id === item.vehicleId))} · ${euro.format(item.amount)}`, type: 'impuesto' as const })),
-    ...state.fines.map(item => ({ id: `fine-${item.id}`, date: item.dueDate || item.infractionDate, title: item.concept, detail: `${vehicleLabel(state.vehicles.find(vehicle => vehicle.id === item.vehicleId))} · ${euro.format(item.amount)}`, type: 'multa' as const })),
+    ...state.documents.filter(item => !afterRetirement(state, item.vehicleId, item.expiryDate)).map(item => ({ id: `document-${item.id}`, date: item.expiryDate, title: `Vence ${item.type}`, detail: vehicleLabel(state.vehicles.find(vehicle => vehicle.id === item.vehicleId)), type: item.type.toLowerCase().includes('itv') ? 'itv' as const : 'documento' as const })),
+    ...state.taxes.filter(item => !afterRetirement(state, item.vehicleId, item.dueDate)).map(item => ({ id: `tax-${item.id}`, date: item.dueDate, title: item.concept, detail: `${vehicleLabel(state.vehicles.find(vehicle => vehicle.id === item.vehicleId))} · ${euro.format(item.amount)}`, type: 'impuesto' as const })),
+    ...state.fines.map(item => ({ id: `fine-${item.id}`, date: item.dueDate || item.infractionDate, title: item.concept, detail: `${vehicleLabel(state.vehicles.find(vehicle => vehicle.id === item.vehicleId), item.vehicleSnapshot)} · ${euro.format(item.amount)}`, type: 'multa' as const })),
   ], [state])
 
   const year = cursor.getFullYear()

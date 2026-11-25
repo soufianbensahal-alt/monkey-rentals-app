@@ -7,7 +7,8 @@ import { ListPagination } from '../components/ListPagination'
 import { useFleet } from '../store/FleetContext'
 import { date, euroWithCents as euro } from '../lib/format'
 import { usePagination } from '../lib/pagination'
-import { vehicleLabel } from '../lib/vehicles'
+import { vehicleLabel, vehicleOptionLabel } from '../lib/vehicles'
+import { VehicleStateBadge } from '../components/VehicleLifecycle'
 import { blankExpense, deleteExpense, emptyExpenseFilters, expenseCategories, expenseDetail, filterExpenses, summarizeExpenses, useExpenses, type Expense, type ExpenseCategory, type ExpenseFilters, type VehicleFilter } from '../lib/expenses'
 
 export default function ExpensesPage() {
@@ -23,7 +24,8 @@ export default function ExpensesPage() {
   const pagination = usePagination(rows, 20)
   const set = (patch: Partial<ExpenseFilters>) => setFilters(current => ({ ...current, ...patch }))
   const filtered = JSON.stringify(filters) !== JSON.stringify(emptyExpenseFilters)
-  const vehicleName = (id?: string) => { if (!id) return undefined; const vehicle = state.vehicles.find(item => item.id === id); return vehicle ? `${vehicle.plate} · ${vehicleLabel(vehicle)}` : 'Vehículo eliminado' }
+  const vehicleName = (expense: Expense) => { if (!expense.vehicleId) return undefined; const vehicle = state.vehicles.find(item => item.id === expense.vehicleId); const snapshot = expense.vehicleSnapshot || undefined; return <span className="flex flex-wrap items-center gap-2">{vehicle ? `${vehicle.plate} · ${vehicleLabel(vehicle)}` : snapshot ? `${snapshot.plate} · ${snapshot.label}` : 'Vehículo eliminado'}<VehicleStateBadge vehicle={vehicle} snapshot={snapshot}/></span> }
+  const deletedVehicles = useMemo(() => [...new Map(expenses.filter(expense => expense.vehicleId && expense.vehicleSnapshot && !state.vehicles.some(vehicle => vehicle.id === expense.vehicleId)).map(expense => [expense.vehicleId!, expense.vehicleSnapshot!])).entries()], [expenses, state.vehicles])
   const remove = async (expense: Expense) => { setActionError(''); try { await deleteExpense(expense) } catch (problem) { setActionError(problem instanceof Error ? problem.message : 'No se ha podido eliminar el gasto.') } }
   const add = () => setEditing(blankExpense(filters.vehicle.startsWith('vehicle:') ? filters.vehicle.slice(8) : undefined))
 
@@ -42,7 +44,7 @@ export default function ExpensesPage() {
     </section>
     <div className="my-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <label><span className="label">Categoría</span><select className="field" value={filters.category} onChange={e => set({ category: e.target.value as ExpenseFilters['category'] })}><option value="todas">Todas</option>{Object.entries(expenseCategories).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-      <label><span className="label">Vehículo</span><select className="field" value={filters.vehicle} onChange={e => set({ vehicle: e.target.value as VehicleFilter })}><option value="todos">Todos los gastos</option><option value="genericos">Solo genéricos de flota</option><option value="vinculados">Solo vinculados a vehículos</option>{state.vehicles.map(vehicle => <option key={vehicle.id} value={`vehicle:${vehicle.id}`}>{vehicle.plate} · {vehicleLabel(vehicle)}</option>)}</select></label>
+      <label><span className="label">Vehículo</span><select className="field" value={filters.vehicle} onChange={e => set({ vehicle: e.target.value as VehicleFilter })}><option value="todos">Todos los gastos</option><option value="genericos">Solo genéricos de flota</option><option value="vinculados">Solo vinculados a vehículos</option>{state.vehicles.map(vehicle => <option key={vehicle.id} value={`vehicle:${vehicle.id}`}>{vehicle.plate} · {vehicleLabel(vehicle)}{vehicleOptionLabel(vehicle)}</option>)}{deletedVehicles.map(([id, snapshot]) => <option key={id} value={`vehicle:${id}`}>{snapshot.plate} · {snapshot.label} (eliminado)</option>)}</select></label>
       <label><span className="label">Desde</span><input className="field" type="date" value={filters.from} onChange={e => set({ from: e.target.value })}/></label>
       <label><span className="label">Hasta</span><input className="field" type="date" value={filters.to} onChange={e => set({ to: e.target.value })}/></label>
     </div>
@@ -53,7 +55,7 @@ export default function ExpensesPage() {
         return <tr key={expense.id}>
           <td className="whitespace-nowrap">{date(expense.date)}</td>
           <td><Badge tone="info">{expenseCategories[expense.category]}</Badge><span className="mt-1 block max-w-xs text-sm text-ink">{expense.description || 'Sin descripción'}</span>{detail && <span className="block text-xs text-stone-500">{detail}</span>}</td>
-          <td>{vehicleName(expense.vehicleId) || <span className="text-stone-500">Genérico de flota</span>}</td>
+          <td>{vehicleName(expense) || <span className="text-stone-500">Genérico de flota</span>}</td>
           <td>{expense.supplier || '—'}</td>
           <td className="font-bold tabular-nums">{euro.format(expense.amount)}{expense.attachment && <Paperclip size={14} className="ml-1 inline text-stone-500" aria-label="Con ticket adjunto"/>}</td>
           <td><div className="flex items-center gap-4"><button onClick={() => setEditing(expense)} aria-label={`Editar gasto del ${date(expense.date)}`} className="text-stone-500 hover:text-brand-600"><Pencil size={18}/></button><ConfirmButton title="Eliminar gasto" message="¿Seguro que quieres eliminar este gasto? También se eliminará su ticket adjunto." onConfirm={() => void remove(expense)}/></div></td>

@@ -30,7 +30,8 @@ export function reminderDetails(event:CalendarEvent,state:FleetState) {
   const customer=state.customers.find(c=>c.id===event.customerId)
   const vehicle=state.vehicles.find(v=>v.id===event.vehicleId)
   const payment=state.payments.find(p=>p.id===event.paymentId)
-  return [event.description,customer?.name,vehicle && `${vehicle.plate} · ${vehicle.brand} ${vehicle.model}`,payment && `${payment.amount} € · ${payment.dueDate}`].filter(Boolean).join(' · ')
+  const snapshot=!vehicle?event.vehicleSnapshot:undefined
+  return [event.description,customer?.name,vehicle ? `${vehicle.plate} · ${vehicle.brand} ${vehicle.model}` : snapshot && `${snapshot.plate} · ${snapshot.label}`,payment && `${payment.amount} € · ${payment.dueDate}`].filter(Boolean).join(' · ')
 }
 export function dateInZone(now=new Date(),timezone=defaultTimezone) {return Temporal.Instant.from(now.toISOString()).toZonedDateTimeISO(timezone).toPlainDate().toString()}
 export function upcomingReminders(state:FleetState,now=new Date()) {

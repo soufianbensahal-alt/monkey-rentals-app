@@ -6,7 +6,7 @@ import { Badge, EmptyState, PageHeader } from '../components/ui'
 import { date, euro, euroWithCents } from '../lib/format'
 import { downloadReportExcel } from '../lib/reportExcel'
 import { buildReport, type EconomicMovement } from '../lib/reports'
-import { vehicleLabel } from '../lib/vehicles'
+import { vehicleLabel, vehicleSnapshots } from '../lib/vehicles'
 import { MileageOverview } from '../components/MileageOverview'
 import { useFleet } from '../store/FleetContext'
 import { usePagination } from '../lib/pagination'
@@ -22,7 +22,7 @@ export default function ReportsPage(){
   const [exporting,setExporting]=useState(false)
   const report=useMemo(()=>buildReport(state),[state])
   const movementPagination=usePagination(report.movements,50)
-  const vehicleName=(id?:string)=>id?vehicleLabel(state.vehicles.find(item=>item.id===id)):'Sin datos'
+  const vehicleName=(id?:string)=>id?vehicleLabel(state.vehicles.find(item=>item.id===id),vehicleSnapshots(state).get(id)):'Sin datos'
   const hasData=report.hasEconomicData
   const exportExcel=async()=>{
     if (exporting || syncStatus === 'loading') return
