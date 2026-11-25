@@ -1,7 +1,7 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useDeferredValue, useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react'
 import { CheckCircle2, KeyRound, Pencil, Plus, Search } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
-import { Badge, ConfirmButton, EmptyState, Modal, PageHeader } from '../components/ui'
+import { Badge, ConfirmButton, EmptyState, Modal, ModalActions, PageHeader } from '../components/ui'
 import { useFleet } from '../store/FleetContext'
 import { date, euro, euroWithCents, uid } from '../lib/format'
 import { paymentReminderLabel, recurrenceFromFrequency, reminderFrequencyLabels, suggestedReminderFrequency } from '../lib/paymentReminders'
@@ -213,6 +213,7 @@ function RentalModal({ rental, state, error, onClose, onSave }: { rental: Rental
   const uploadDocuments=async(files:FileList|null)=>{if(!files?.length)return;setFileBusy(true);setFileError('');try{for(const file of Array.from(files)){const stored=await uploadPrivateFile(file,{type:'rental',recordId:rentalId,vehicleId,customerId,documentType}) as RentalDocument;staged.current.push(stored);setDocuments(current=>[...current,stored])}}catch(err){setFileError(err instanceof Error?err.message:'No se ha podido subir el documento.')}finally{setFileBusy(false)}}
   const removeDocument=(file:RentalDocument)=>{setDocuments(current=>current.filter(item=>item.id!==file.id));if(!staged.current.some(item=>item.id===file.id))removed.current.push(file)}
   const [submitting,setSubmitting]=useState(false)
+  const formId=useId()
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if(fileBusy||submitting)return
@@ -250,8 +251,8 @@ function RentalModal({ rental, state, error, onClose, onSave }: { rental: Rental
     if (!reminderTouched) setPaymentReminderFrequency(suggestedReminderFrequency(value))
   }
 
-  return <Modal title={rental.id ? 'Editar alquiler' : 'Crear alquiler'} onClose={onClose}>
-    <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
+  return <Modal title={rental.id ? 'Editar alquiler' : 'Crear alquiler'} onClose={onClose} footer={<ModalActions><button type="button" className="btn-secondary" disabled={fileBusy||submitting} onClick={onClose}>Cancelar</button><button type="submit" form={formId} className="btn-primary" disabled={fileBusy||submitting}>{fileBusy?'Subiendo archivo…':submitting?'Guardando en Supabase…':'Guardar alquiler'}</button></ModalActions>}>
+    <form id={formId} onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
       {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700 sm:col-span-2">{error}</p>}
       <label><span className="label">Vehículo *</span><select name="vehicleId" className="field" value={vehicleId} onChange={event => { const id = event.target.value; setVehicleId(id); setMileage({ ...mileage, kmExtraDefaultPrice: undefined, ...(!rental.id ? { kmStart: getVehicleMileage(state, id).currentKm, kmIncludedPerUnit: state.vehicles.find(v => v.id === id)?.includedKmPerDay } : {}) }); setCreateMileageCharge(false) }} required>{vehicleOptions(state, rental.vehicleId).map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicleLabel(vehicle)} · {vehicle.plate}{vehicleOptionLabel(vehicle)}</option>)}{rental.vehicleSnapshot && !state.vehicles.some(vehicle => vehicle.id === rental.vehicleId) && <option value={rental.vehicleId}>{rental.vehicleSnapshot.label} · {rental.vehicleSnapshot.plate} (eliminado)</option>}</select></label>
       <label><span className="label">Cliente *</span><select name="customerId" className="field" value={customerId} onChange={event => setCustomerId(event.target.value)} required>{state.customers.map(customer => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label>
@@ -280,7 +281,6 @@ function RentalModal({ rental, state, error, onClose, onSave }: { rental: Rental
       <p className="self-end rounded-xl bg-brand-50 p-3 text-sm text-stone-600">La app sugiere el recordatorio según el periodo, pero puedes cambiarlo. “Una vez” no genera otro vencimiento al cobrar.</p>
       <label className="sm:col-span-2"><span className="label">Notas</span><textarea name="notes" className="field min-h-24" value={notes} onChange={event => setNotes(event.target.value)}/></label>
       <fieldset className="space-y-3 rounded-xl border border-orange-100 p-4 sm:col-span-2"><legend className="px-2 font-display text-lg font-bold">Documentos del alquiler</legend><p className="text-sm text-stone-500">Adjunta el contrato firmado u otros documentos en PDF o imagen. Máximo 10 MB por archivo.</p>{fileError&&<p role="alert" className="text-sm font-semibold text-red-700">{fileError}</p>}<div className="flex flex-wrap gap-3">{documents.map(file=><PrivateFileView key={file.id} file={file} target="rental" onRemove={()=>removeDocument(file)}/>)}</div><div className="grid gap-3 sm:grid-cols-2"><label><span className="label">Tipo de documento</span><select className="field" value={documentType} onChange={event=>setDocumentType(event.target.value as RentalDocumentType)}><option value="signed_contract">Contrato firmado</option><option value="delivery_document">Documento de entrega</option><option value="return_document">Documento de devolución</option><option value="other">Otro</option></select></label><label><span className="label">Archivo</span><input className="field" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple disabled={fileBusy||submitting} onChange={event=>{void uploadDocuments(event.target.files);event.target.value=''}}/></label></div><label><span className="label">Foto desde el móvil</span><input className="field" type="file" accept="image/*" capture="environment" disabled={fileBusy||submitting} onChange={event=>{void uploadDocuments(event.target.files);event.target.value=''}}/></label></fieldset>
-      <div className="flex gap-3 sm:col-span-2 sm:justify-end"><button type="button" className="btn-secondary" disabled={fileBusy||submitting} onClick={onClose}>Cancelar</button><button className="btn-primary" disabled={fileBusy||submitting}>{fileBusy?'Subiendo archivo…':submitting?'Guardando en Supabase…':'Guardar alquiler'}</button></div>
     </form>
   </Modal>
 }

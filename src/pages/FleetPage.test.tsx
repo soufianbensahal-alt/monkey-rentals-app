@@ -32,6 +32,25 @@ const table = () => screen.getByRole('table')
 describe('Baja de vehículos en Flota', () => {
   beforeEach(() => { localStorage.clear(); localStorage.setItem(STORAGE_KEY, JSON.stringify(initial())) })
 
+  it('el modal de edición tiene las acciones en un pie fijo fuera del scroll y bloquea el fondo', async () => {
+    show(<FleetPage/>)
+    fireEvent.click(screen.getByRole('button', { name: 'Editar 2222BBB' }))
+    const dialog = screen.getByRole('dialog')
+    const body = dialog.querySelector('.modal-body')!, footer = dialog.querySelector('.modal-footer')!
+    expect(document.body.style.overflow).toBe('hidden')
+    for (const name of ['Dar de baja', 'Cancelar', 'Guardar vehículo']) {
+      const button = within(dialog).getByRole('button', { name: new RegExp(name) })
+      expect(footer).toContainElement(button)
+      expect(body).not.toContainElement(button)
+    }
+    expect(body).toContainElement(within(dialog).getByLabelText(/Notas internas/))
+    fireEvent.change(within(dialog).getByLabelText(/Notas internas/), { target: { value: 'Guardado desde el pie' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar vehículo' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(cached().vehicles.find(v => v.id === 'v2')?.notes).toBe('Guardado desde el pie')
+    expect(document.body.style.overflow).toBe('')
+  })
+
   it('no deja dar de baja un vehículo con un alquiler en curso y lista los alquileres afectados', () => {
     show(<FleetPage/>)
     fireEvent.click(screen.getByRole('button', { name: 'Dar de baja 1111AAA' }))
@@ -46,8 +65,10 @@ describe('Baja de vehículos en Flota', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Dar de baja 2222BBB' }))
     let dialog = screen.getByRole('dialog')
     fireEvent.change(within(dialog).getByLabelText(/Motivo/), { target: { value: 'otro' } })
-    fireEvent.submit(within(dialog).getByRole('button', { name: 'Dar de baja' }).closest('form')!)
-    expect(within(dialog).getByRole('alert')).toHaveTextContent('notas')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Dar de baja' }))
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Explica el motivo en las notas cuando eliges «Otro».')
+    expect(within(dialog).getByRole('alert')).toHaveClass('bg-red-50', 'text-red-700')
+    expect(cached().vehicles.find(v => v.id === 'v2')?.estado).toBeUndefined()
     fireEvent.change(within(dialog).getByLabelText(/Motivo/), { target: { value: 'venta' } })
     fireEvent.change(within(dialog).getByLabelText(/Comprador/), { target: { value: 'Taller Sur' } })
     expect(dialog).toHaveTextContent('dejará de aparecer en la flota, pero se conservará su historial')

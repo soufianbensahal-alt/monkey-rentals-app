@@ -1,7 +1,7 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useId, useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Archive, History, RotateCcw, Trash2 } from 'lucide-react'
-import { Badge, Modal } from './ui'
+import { Badge, Modal, ModalActions } from './ui'
 import { MileageHistory } from './MileageHistory'
 import { useFleet } from '../store/FleetContext'
 import { date, euroWithCents } from '../lib/format'
@@ -40,6 +40,7 @@ export function RetireVehicleModal({ vehicle, onClose }: { vehicle: Vehicle; onC
   const [busy, setBusy] = useState(false), [error, setError] = useState('')
   const blockers = retirementBlockers(state, vehicle.id)
   const set = (patch: Partial<RetirementInput>) => setDraft(current => ({ ...current, ...patch }))
+  const formId = useId()
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     const problem = validateRetirement(draft)
@@ -49,9 +50,12 @@ export function RetireVehicleModal({ vehicle, onClose }: { vehicle: Vehicle; onC
     catch (problem) { setError(problem instanceof Error ? problem.message : 'No se ha podido dar de baja el vehículo.') }
     finally { setBusy(false) }
   }
-  return <Modal title={`Dar de baja · ${vehicle.plate}`} onClose={() => { if (!busy) onClose() }}>
-    {blockers.length ? <div className="grid gap-4"><BlockingRentals rentals={blockers} state={state} action="dar de baja"/><div className="flex justify-end"><button type="button" className="btn-secondary" onClick={onClose}>Cerrar</button></div></div>
-      : <form onSubmit={event => void submit(event)} className="grid gap-4 sm:grid-cols-2">
+  const footer = blockers.length
+    ? <ModalActions><button type="button" className="btn-secondary" onClick={onClose}>Cerrar</button></ModalActions>
+    : <ModalActions><button type="button" className="btn-secondary" disabled={busy} onClick={onClose}>Cancelar</button><button type="submit" form={formId} className="btn-danger" disabled={busy}><Archive size={18}/>{busy ? 'Guardando…' : 'Dar de baja'}</button></ModalActions>
+  return <Modal title={`Dar de baja · ${vehicle.plate}`} onClose={() => { if (!busy) onClose() }} footer={footer}>
+    {blockers.length ? <BlockingRentals rentals={blockers} state={state} action="dar de baja"/>
+      : <form id={formId} noValidate onSubmit={event => void submit(event)} className="grid gap-4 sm:grid-cols-2">
         {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700 sm:col-span-2">{error}</p>}
         <label><span className="label">Motivo *</span><select className="field" value={draft.motivo} onChange={e => set({ motivo: e.target.value as VehicleRetirementReason })}>{Object.entries(retirementReasons).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         <label><span className="label">Fecha de baja *</span><input className="field" type="date" required max={localToday()} value={draft.fecha} onChange={e => set({ fecha: e.target.value })}/></label>
@@ -65,7 +69,6 @@ export function RetireVehicleModal({ vehicle, onClose }: { vehicle: Vehicle; onC
         </>}
         <label className="sm:col-span-2"><span className="label">Notas{draft.motivo === 'otro' ? ' *' : ''}</span><textarea className="field min-h-24" maxLength={2000} required={draft.motivo === 'otro'} value={draft.notas} onChange={e => set({ notas: e.target.value })}/></label>
         <p className="rounded-xl border border-orange-100 bg-brand-50 p-3 text-sm text-stone-700 sm:col-span-2"><strong>{vehicleLabel(vehicle)} · {vehicle.plate}</strong> dejará de aparecer en la flota, pero se conservará su historial. Podrás reactivarlo desde Flota › Archivados.</p>
-        <div className="flex gap-3 sm:col-span-2 sm:justify-end"><button type="button" className="btn-secondary" disabled={busy} onClick={onClose}>Cancelar</button><button className="btn-danger" disabled={busy}><Archive size={18}/>{busy ? 'Guardando…' : 'Dar de baja'}</button></div>
       </form>}
   </Modal>
 }
@@ -89,7 +92,10 @@ export function ArchivedVehicleModal({ vehicle, onClose }: { vehicle: Vehicle; o
     catch (problem) { setError(problem instanceof Error ? problem.message : 'No se ha podido reactivar el vehículo.') }
     finally { setBusy(false) }
   }
-  return <Modal title={`${vehicleLabel(vehicle)} · ${vehicle.plate}`} onClose={() => { if (!busy) onClose() }}>
+  const footer = confirming
+    ? <ModalActions><button type="button" className="btn-secondary" disabled={busy} onClick={() => setConfirming(false)}>Cancelar</button><button type="button" className="btn-primary" disabled={busy} onClick={() => void reactivate()}><RotateCcw size={18}/>{busy ? 'Guardando…' : 'Confirmar reactivación'}</button></ModalActions>
+    : <ModalActions><button type="button" className="btn-secondary" onClick={onClose}>Cerrar</button><button type="button" className="btn-primary" onClick={() => setConfirming(true)}><RotateCcw size={18}/> Reactivar vehículo</button></ModalActions>
+  return <Modal title={`${vehicleLabel(vehicle)} · ${vehicle.plate}`} onClose={() => { if (!busy) onClose() }} footer={footer}>
     <div className="grid gap-5">
       <div className="flex flex-wrap items-center gap-2"><VehicleStateBadge vehicle={vehicle}/><span className="text-sm text-stone-500">Ficha de solo lectura</span></div>
       {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
@@ -113,11 +119,10 @@ export function ArchivedVehicleModal({ vehicle, onClose }: { vehicle: Vehicle; o
       </section>
       <MileageHistory rentals={rentals} state={state}/>
       <Link className="text-sm font-bold text-brand-600" to={`/app/documentacion?vehicle=${encodeURIComponent(vehicle.id)}`} onClick={onClose}>Ver documentación, impuestos y multas</Link>
-      {confirming ? <div className="grid gap-3 rounded-xl border border-orange-200 bg-brand-50 p-4">
+      {confirming && <div className="grid gap-3 rounded-xl border border-orange-200 bg-brand-50 p-4">
         <p className="text-sm font-semibold text-ink">El vehículo volverá a la flota activa y aparecerá en el dashboard y en los selectores de alquiler.</p>
         <label><span className="label">Notas (opcional)</span><textarea className="field min-h-20" maxLength={2000} value={notes} onChange={e => setNotes(e.target.value)}/></label>
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><button type="button" className="btn-secondary" disabled={busy} onClick={() => setConfirming(false)}>Cancelar</button><button type="button" className="btn-primary" disabled={busy} onClick={() => void reactivate()}><RotateCcw size={18}/>{busy ? 'Guardando…' : 'Confirmar reactivación'}</button></div>
-      </div> : <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><button type="button" className="btn-secondary" onClick={onClose}>Cerrar</button><button type="button" className="btn-primary" onClick={() => setConfirming(true)}><RotateCcw size={18}/> Reactivar vehículo</button></div>}
+      </div>}
     </div>
   </Modal>
 }
@@ -157,7 +162,11 @@ export function DeleteVehicleModal({ vehicle, onClose, onArchive }: { vehicle: V
     } catch (problem) { setError(problem instanceof Error ? problem.message : 'No se ha podido eliminar el vehículo.') }
     finally { setBusy(false) }
   }
-  return <Modal title={`Eliminar ${vehicle.plate}`} onClose={() => { if (!busy) onClose() }}>
+  const footer = <ModalActions start={!blockers.length && !isRetired(vehicle) && onArchive ? <button type="button" className="btn-primary" disabled={busy} onClick={onArchive}><Archive size={18}/> Archivar en su lugar</button> : undefined}>
+    <button type="button" className="btn-secondary" disabled={busy} onClick={onClose}>Cancelar</button>
+    {!blockers.length && <button type="button" className="btn-danger" disabled={busy} onClick={() => void confirm()}><Trash2 size={18}/>{busy ? 'Eliminando…' : 'Eliminar definitivamente'}</button>}
+  </ModalActions>
+  return <Modal title={`Eliminar ${vehicle.plate}`} onClose={() => { if (!busy) onClose() }} footer={footer}>
     <div className="confirm-dialog grid gap-4">
       {blockers.length ? <BlockingRentals rentals={blockers} state={state} action="eliminar"/> : <>
         {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
@@ -171,13 +180,6 @@ export function DeleteVehicleModal({ vehicle, onClose, onArchive }: { vehicle: V
         </div>
         <p className="text-sm font-semibold text-red-700">El vehículo y los registros de la columna «Se borra» no se pueden recuperar.</p>
       </>}
-      <div className="confirm-actions flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-        <button type="button" className="btn-secondary" disabled={busy} onClick={onClose}>Cancelar</button>
-        {!blockers.length && <>
-          <button type="button" className="btn-danger" disabled={busy} onClick={() => void confirm()}><Trash2 size={18}/>{busy ? 'Eliminando…' : 'Eliminar definitivamente'}</button>
-          {!isRetired(vehicle) && onArchive && <button type="button" className="btn-primary" disabled={busy} onClick={onArchive}><Archive size={18}/> Archivar en su lugar</button>}
-        </>}
-      </div>
     </div>
   </Modal>
 }

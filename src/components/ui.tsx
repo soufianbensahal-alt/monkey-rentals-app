@@ -35,7 +35,20 @@ export function StatCard({ label, value, detail, icon:Icon, tone='orange', value
   return <article className="card p-5"><div className="flex items-start justify-between"><div><p className="text-sm font-medium text-stone-500">{label}</p><p className={`mt-2 font-display text-3xl font-bold tabular-nums ${valueTone === 'green' ? 'text-emerald-700' : valueTone === 'red' ? 'text-red-700' : 'text-ink'}`}>{value}</p></div><span className={`grid size-11 place-items-center rounded-xl ${tones[tone]}`}><Icon size={21} aria-hidden="true" /></span></div><p className="mt-3 text-xs font-medium text-stone-500">{detail}</p></article>
 }
 
-export function Modal({ title, children, onClose, wide=false }: { title:string; children:ReactNode; onClose:()=>void; wide?:boolean }) {
+const stickyFormActions = '[&_form>div:last-child]:sticky [&_form>div:last-child]:bottom-0 [&_form>div:last-child]:z-10 [&_form>div:last-child]:border-t [&_form>div:last-child]:border-orange-100 [&_form>div:last-child]:bg-white [&_form>div:last-child]:py-4'
+
+// Action bar for Modal `footer`: an optional action on the left (its own full-width row on
+// mobile) and the main actions on the right.
+export function ModalActions({ start, children }: { start?: ReactNode; children: ReactNode }) {
+  return <div className="flex flex-wrap items-center gap-3">
+    {start && <div className="flex w-full sm:mr-auto sm:w-auto [&>*]:w-full sm:[&>*]:w-auto">{start}</div>}
+    <div className="flex w-full gap-3 sm:ml-auto sm:w-auto [&>*]:flex-1 sm:[&>*]:flex-none">{children}</div>
+  </div>
+}
+
+// Three zones: fixed header, scrollable body and, when `footer` is given, a fixed action bar
+// outside the scroll area. Without `footer`, the last row of a form stays sticky (legacy).
+export function Modal({ title, children, onClose, wide=false, footer }: { title:string; children:ReactNode; onClose:()=>void; wide?:boolean; footer?:ReactNode }) {
   const panelRef = useRef<HTMLDivElement>(null)
   const onCloseRef = useRef(onClose)
   useEffect(() => { onCloseRef.current = onClose }, [onClose])
@@ -47,11 +60,12 @@ export function Modal({ title, children, onClose, wide=false }: { title:string; 
     return () => { releaseScrollLock(); document.removeEventListener('keydown', closeOnEscape) }
   }, [])
   const modal = <div className="fixed inset-0 z-[1000] flex h-dvh w-screen items-center justify-center overflow-hidden bg-stone-950/55 p-3 backdrop-blur-[2px] sm:p-6" role="dialog" aria-modal="true" aria-labelledby="modal-title" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
-    <div ref={panelRef} tabIndex={-1} className={`modal-panel flex max-h-[calc(100dvh-1.5rem)] w-full ${wide?'max-w-5xl':'max-w-2xl'} flex-col overflow-hidden rounded-2xl border border-orange-100 bg-white shadow-[0_24px_80px_rgba(28,25,23,.28)] outline-none sm:max-h-[calc(100dvh-3rem)] sm:rounded-3xl`}>
+    <div ref={panelRef} tabIndex={-1} className={`modal-panel flex max-h-[calc(100dvh-1.5rem)] w-full ${wide?'max-w-5xl':'max-w-2xl'} flex-col overflow-hidden rounded-2xl border border-orange-100 bg-white shadow-[0_24px_80px_rgba(28,25,23,.28)] outline-none sm:max-h-[90dvh] sm:rounded-3xl`}>
       <div className="modal-header flex shrink-0 items-center justify-between border-b border-orange-100 bg-white px-5 py-4 sm:px-7 sm:py-5"><h2 id="modal-title" className="font-display text-xl font-bold text-ink sm:text-2xl">{title}</h2><button className="icon-btn shrink-0" onClick={onClose} aria-label="Cerrar"><X size={20}/></button></div>
-      <div className="modal-body min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-7 sm:py-6 [&_form>div:last-child]:sticky [&_form>div:last-child]:bottom-0 [&_form>div:last-child]:z-10 [&_form>div:last-child]:border-t [&_form>div:last-child]:border-orange-100 [&_form>div:last-child]:bg-white [&_form>div:last-child]:py-4">
+      <div className={`modal-body min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-7 sm:py-6 ${footer ? '' : stickyFormActions}`}>
         {children}
       </div>
+      {footer && <div className="modal-footer shrink-0 border-t border-orange-100 bg-white px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-7 sm:pb-5">{footer}</div>}
     </div>
   </div>
   return createPortal(modal, document.body)
