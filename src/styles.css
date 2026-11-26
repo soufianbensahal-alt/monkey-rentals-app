@@ -13,8 +13,8 @@
   --font-display: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
 }
 
-:root { --app-bg:#fffaf5; --app-surface:#ffffff; --app-surface-soft:#fff7ed; --app-text:#17201d; --app-muted:#66615e; --app-border:#ffedd5; color:var(--app-text); background:var(--app-bg); font-synthesis:none; text-rendering:optimizeLegibility; color-scheme:light; }
-:root[data-theme="dark"] { --app-bg:#0f0f0f; --app-surface:#1a1a1a; --app-surface-soft:#231912; --app-text:#ffffff; --app-muted:#b5b5b5; --app-border:#34271f; color-scheme:dark; }
+:root { --app-bg:#fffaf5; --app-surface:#ffffff; --app-surface-soft:#fff7ed; --app-text:#17201d; --app-muted:#66615e; --app-border:#ffedd5; --badge-neutral-bg:#f5f5f4; --badge-neutral-text:#44403c; --badge-neutral-ring:#e7e5e4; --badge-retired-bg:rgba(245,158,11,.14); --badge-retired-text:#92400e; --badge-retired-ring:rgba(217,119,6,.35); --row-hover:var(--app-surface-soft); --row-active:#ffedd5; color:var(--app-text); background:var(--app-bg); font-synthesis:none; text-rendering:optimizeLegibility; color-scheme:light; }
+:root[data-theme="dark"] { --app-bg:#0f0f0f; --app-surface:#1a1a1a; --app-surface-soft:#231912; --app-text:#ffffff; --app-muted:#b5b5b5; --app-border:#34271f; --badge-neutral-bg:rgba(255,255,255,.08); --badge-neutral-text:#e7e5e4; --badge-neutral-ring:rgba(255,255,255,.18); --badge-retired-bg:rgba(251,191,36,.14); --badge-retired-text:#fcd34d; --badge-retired-ring:rgba(251,191,36,.35); --row-hover:var(--app-surface-soft); --row-active:#2f2118; color-scheme:dark; }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body { margin:0; min-width:320px; min-height:100dvh; background:var(--app-bg); color:var(--app-text); }
@@ -38,6 +38,21 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .data-table th { @apply border-b border-orange-100 bg-brand-50/60 px-5 py-3.5 text-xs font-bold uppercase tracking-wider text-stone-500; }
 .data-table td { @apply border-b border-stone-100 px-5 py-4 text-sm text-stone-700; }
 .data-table tr:last-child td { @apply border-b-0; }
+.badge-neutral { background:var(--badge-neutral-bg); color:var(--badge-neutral-text); box-shadow:inset 0 0 0 1px var(--badge-neutral-ring); }
+.badge-retired { background:var(--badge-retired-bg); color:var(--badge-retired-text); box-shadow:inset 0 0 0 1px var(--badge-retired-ring); }
+.vehicle-state-badge { white-space:nowrap; flex-shrink:0; margin-right:.5rem; }
+.archived-table th { @apply py-2 align-middle; }
+.archived-row { cursor:pointer; }
+.archived-row td { transition:background-color .15s ease; }
+.archived-row:hover td, .archived-row:focus-within td { background:var(--row-hover); }
+.archived-row:active td { background:var(--row-active); }
+.archived-row-chevron { color:var(--app-muted); transition:color .15s ease, transform .15s ease; }
+.archived-row:hover .archived-row-chevron { color:#ea580c; transform:translateX(2px); }
+@media (max-width:639px) {
+  .archived-table { min-width:0; }
+  .archived-table th, .archived-table td { padding-left:1rem; padding-right:1rem; }
+  .archived-table td:last-child { padding-left:0; padding-right:.5rem; }
+}
 .fade-up { animation: fade-up .5s ease-out both; }
 .calendar-shell { @apply overflow-hidden rounded-[28px] border border-orange-100 bg-white shadow-[0_18px_55px_rgba(23,32,29,.08)]; }
 .calendar-toolbar { @apply flex items-center gap-3 border-b border-orange-100 bg-gradient-to-r from-white to-orange-50/60 p-4 sm:gap-5 sm:p-7; }
@@ -170,6 +185,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 :root[data-theme="dark"] .modal-body input[type="file"] { color:#b8b8b8; }
 :root[data-theme="dark"] .data-table th { background:var(--app-surface-soft); border-color:var(--app-border); color:var(--app-muted); }
 :root[data-theme="dark"] .data-table td { border-color:var(--app-border); color:#e7e5e4; }
+:root[data-theme="dark"] .archived-row:hover .archived-row-chevron { color:#fb923c; }
 :root[data-theme="dark"] .calendar-shell, :root[data-theme="dark"] .calendar-agenda, :root[data-theme="dark"] .calendar-view-switch, :root[data-theme="dark"] .calendar-toolbar, :root[data-theme="dark"] .calendar-select, :root[data-theme="dark"] .calendar-arrow { background:var(--app-surface); border-color:var(--app-border); }
 :root[data-theme="dark"] .calendar-toolbar { background:#181818; border-color:rgba(255,255,255,.08); }
 :root[data-theme="dark"] .calendar-select {

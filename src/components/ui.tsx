@@ -19,9 +19,11 @@ function lockBodyScroll() {
   }
 }
 
-export function Badge({ children, tone='neutral' }: { children:ReactNode; tone?:'success'|'warning'|'danger'|'info'|'neutral' }) {
-  const styles = { success:'bg-emerald-50 text-emerald-700 ring-emerald-200', warning:'bg-amber-50 text-amber-800 ring-amber-200', danger:'bg-red-50 text-red-700 ring-red-200', info:'bg-blue-50 text-blue-700 ring-blue-200', neutral:'bg-stone-100 text-stone-700 ring-stone-200' }
-  return <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold capitalize ring-1 ring-inset ${styles[tone]}`}>{children}</span>
+// Neutral and retired tones use theme-aware classes (styles.css) so they stay legible in dark mode.
+// `sentenceCase` skips the CSS capitalize so labels like "De baja · Venta" keep their own casing.
+export function Badge({ children, tone='neutral', sentenceCase=false, className='' }: { children:ReactNode; tone?:'success'|'warning'|'danger'|'info'|'neutral'|'retired'; sentenceCase?:boolean; className?:string }) {
+  const styles = { success:'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200', warning:'bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200', danger:'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200', info:'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200', neutral:'badge-neutral', retired:'badge-retired' }
+  return <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${sentenceCase ? '' : 'capitalize'} ${styles[tone]} ${className}`}>{children}</span>
 }
 
 export function PageHeader({ eyebrow, title, description, action }: { eyebrow?:string; title:string; description:string; action?:ReactNode }) {

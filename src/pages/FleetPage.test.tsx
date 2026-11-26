@@ -80,7 +80,8 @@ describe('Baja de vehículos en Flota', () => {
     expect(within(table()).queryByText('2222BBB', { exact: false })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', { name: /Archivados \(1\)/ }))
     expect(within(table()).getByText(/2222BBB/)).toBeInTheDocument()
-    expect(within(table()).getByText('De baja · Venta')).toBeInTheDocument()
+    expect(within(table()).getAllByText('De baja')[0]).toHaveClass('badge-retired', 'vehicle-state-badge')
+    expect(within(table()).getAllByText(/^Venta · \d{2}\/\d{2}\/\d{4}$/).length).toBeGreaterThan(0)
 
     show(<DashboardPage/>, '/app')
     expect(screen.getByText('0 / 1')).toBeInTheDocument()
@@ -93,7 +94,7 @@ describe('Baja de vehículos en Flota', () => {
 
     show(<FleetPage/>)
     fireEvent.click(screen.getByRole('tab', { name: /Archivados/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Ver ficha/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ver ficha de 2222BBB' }))
     dialog = screen.getByRole('dialog')
     expect(within(dialog).getByText('Historial de estados')).toBeInTheDocument()
     fireEvent.click(within(dialog).getByRole('button', { name: /Reactivar vehículo/ }))

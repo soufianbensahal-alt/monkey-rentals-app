@@ -14,9 +14,10 @@ import type { FleetState, Rental, Vehicle, VehicleRetirementReason, VehicleSnaps
 const localToday = () => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}` }
 
 // "De baja · motivo" for retired vehicles and "Eliminado" for records that only keep a snapshot.
-export function VehicleStateBadge({ vehicle, snapshot }: { vehicle?: Vehicle; snapshot?: VehicleSnapshot }) {
-  if (isRetired(vehicle)) return <Badge tone="neutral">De baja{vehicle?.baja ? ` · ${retirementReasons[vehicle.baja.motivo]}` : ''}</Badge>
-  if (!vehicle && snapshot) return <Badge tone="neutral">Eliminado</Badge>
+// `withReason={false}` shows just "De baja" (the Archivados list prints the reason and date beside it).
+export function VehicleStateBadge({ vehicle, snapshot, withReason = true }: { vehicle?: Vehicle; snapshot?: VehicleSnapshot; withReason?: boolean }) {
+  if (isRetired(vehicle)) return <Badge tone="retired" sentenceCase className="vehicle-state-badge">De baja{withReason && vehicle?.baja ? ` · ${retirementReasons[vehicle.baja.motivo]}` : ''}</Badge>
+  if (!vehicle && snapshot) return <Badge tone="neutral" sentenceCase className="vehicle-state-badge">Eliminado</Badge>
   return null
 }
 
